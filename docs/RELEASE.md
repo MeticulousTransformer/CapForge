@@ -7,8 +7,8 @@ v0.3.3 introduces separate native downloads for editors:
 | Intel or Apple Silicon Mac | `CapForge-0.3.3-macOS.dmg` | Drag CapForge.app to Applications and open it |
 | Windows | `CapForge-0.3.3-Windows.exe` | Open the standalone installer |
 
-The [download page](https://meticuloustransformer.github.io/Georgian-Kartuli-After-Effects-Transcribtion-Tool/)
-links to [official GitHub release assets](https://github.com/MeticulousTransformer/Georgian-Kartuli-After-Effects-Transcribtion-Tool/releases/latest).
+The [download page](https://meticuloustransformer.github.io/CapForge/)
+links to [official GitHub release assets](https://github.com/MeticulousTransformer/CapForge/releases/latest).
 Editor instructions are in [Install on Mac](INSTALL_MAC.md),
 [Install on Windows](INSTALL_WINDOWS.md), and [Your first captions](QUICK_START.md).
 The version described here is published only after the release workflow succeeds;

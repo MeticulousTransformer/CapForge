@@ -18,11 +18,11 @@ Finish and Style shuffle. Saved looks include every setting.
 
 | Mac | Windows |
 | --- | --- |
-| **[Download the macOS DMG](https://github.com/MeticulousTransformer/Georgian-Kartuli-After-Effects-Transcribtion-Tool/releases/latest)** | **[Download the Windows Setup EXE](https://github.com/MeticulousTransformer/Georgian-Kartuli-After-Effects-Transcribtion-Tool/releases/latest)** |
+| **[Download the macOS DMG](https://github.com/MeticulousTransformer/CapForge/releases/latest)** | **[Download the Windows Setup EXE](https://github.com/MeticulousTransformer/CapForge/releases/latest)** |
 | Open the DMG → drag CapForge to Applications → open CapForge. | Open `CapForge-0.3.3-Windows.exe` and follow Setup. No ZIP extraction. |
 | [Mac installation guide](docs/INSTALL_MAC.md) | [Windows installation guide](docs/INSTALL_WINDOWS.md) |
 
-**[CapForge download website](https://meticuloustransformer.github.io/Georgian-Kartuli-After-Effects-Transcribtion-Tool/)**
+**[CapForge download website](https://meticuloustransformer.github.io/CapForge/)**
 
 Both native installers use the same **0.3.3** code and release commit. Mac
 supports Apple Silicon and Intel. First setup needs internet and prepares a

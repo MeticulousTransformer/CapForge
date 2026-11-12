@@ -1,7 +1,7 @@
 # Install CapForge on Windows
 
-Get the Windows download from the [CapForge download page](https://meticuloustransformer.github.io/Georgian-Kartuli-After-Effects-Transcribtion-Tool/)
-or [official GitHub release](https://github.com/MeticulousTransformer/Georgian-Kartuli-After-Effects-Transcribtion-Tool/releases/latest).
+Get the Windows download from the [CapForge download page](https://meticuloustransformer.github.io/CapForge/)
+or [official GitHub release](https://github.com/MeticulousTransformer/CapForge/releases/latest).
 For v0.3.3, choose **CapForge-0.3.3-Windows.exe**. It is a standalone installer;
 you do not need to download or extract a ZIP.
 

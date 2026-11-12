@@ -143,16 +143,18 @@ jobs:
           cat > "$RUNNER_TEMP/release-notes.md" <<'NOTES'
           ## Choose your computer
 
-          - **Mac:** download `CapForge-0.3.3-macOS.dmg`, open it, drag CapForge to Applications, and open CapForge. [Mac guide](https://github.com/MeticulousTransformer/Georgian-Kartuli-After-Effects-Transcribtion-Tool/blob/kml/docs/INSTALL_MAC.md).
-          - **Windows:** download and open `CapForge-0.3.3-Windows.exe`. No ZIP extraction. [Windows guide](https://github.com/MeticulousTransformer/Georgian-Kartuli-After-Effects-Transcribtion-Tool/blob/kml/docs/INSTALL_WINDOWS.md).
+          - **Mac:** download `CapForge-0.3.3-macOS.dmg`, open it, drag CapForge to Applications, and open CapForge. [Mac guide](https://github.com/MeticulousTransformer/CapForge/blob/kml/docs/INSTALL_MAC.md).
+          - **Windows:** download and open `CapForge-0.3.3-Windows.exe`. No ZIP extraction. [Windows guide](https://github.com/MeticulousTransformer/CapForge/blob/kml/docs/INSTALL_WINDOWS.md).
 
           Both installers share this exact commit and version. First setup needs internet; Python and audio support are prepared privately. Save your AE project and close AE before installation.
+
+          The GitHub repository is now **MeticulousTransformer/CapForge**. If you downloaded an installer before this rename, download the current DMG or EXE once so its updater uses the new address. Your keys and exports are preserved. [Update guide](https://github.com/MeticulousTransformer/CapForge/blob/kml/docs/UPDATES.md).
 
           This preview is not Developer-ID notarized or Windows code-signed. OS trust warnings can appear. Adobe unsigned-extension mode is an explicit preview option. See your OS guide.
 
           Packaged installation passed on Windows, Apple Silicon and Intel Mac. Real AE compatibility and paid transcription should be checked on your own clips.
 
-          The ZIP assets and their checksums support automatic updates and migration from 0.3.2; new users should choose the DMG or EXE above.
+          The ZIP assets and their checksums support automatic updates and the older installer entry point; new users should choose the DMG or EXE above.
           NOTES
           gh release create "$CAPFORGE_RELEASE_TAG" dist/* --target "$GITHUB_SHA" --title "CapForge 0.3.3 · Mac & Windows · ${GITHUB_SHA:0:7}" --notes-file "$RUNNER_TEMP/release-notes.md" --latest
 

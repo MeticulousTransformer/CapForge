@@ -52,7 +52,7 @@
 Still external to this local validation: complete hosted Windows/Intel Mac
 release checks, signed/notarized distribution, paid-provider transcription,
 and actual playback on other AE versions. Follow the
-[release workflow](https://github.com/MeticulousTransformer/Georgian-Kartuli-After-Effects-Transcribtion-Tool/actions/workflows/release.yml)
+[release workflow](https://github.com/MeticulousTransformer/CapForge/actions/workflows/release.yml)
 for hosted validation and publication results. The Mac-built ZIP includes the
 Windows CMD fallback; GitHub's Windows packaging job adds the native EXE.
 

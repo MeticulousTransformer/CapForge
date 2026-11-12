@@ -9,16 +9,26 @@ after setup finishes. Your keys, exports and saved looks remain in place.
 Update downloads need internet. You do not need to find a ZIP, install Python,
 manage dependencies, or use a terminal. For a first installation or manual repair,
 use the [Mac DMG](INSTALL_MAC.md) or [Windows EXE](INSTALL_WINDOWS.md) from the
-[download page](https://meticuloustransformer.github.io/Georgian-Kartuli-After-Effects-Transcribtion-Tool/)
-or [latest official release](https://github.com/MeticulousTransformer/Georgian-Kartuli-After-Effects-Transcribtion-Tool/releases/latest).
+[download page](https://meticuloustransformer.github.io/CapForge/)
+or [latest official release](https://github.com/MeticulousTransformer/CapForge/releases/latest).
 Saved installers do not fetch a newer application release by themselves. The Mac
 app repairs the installed files when that release is newer than its bundled
 version, preserving the newer installation. The Windows EXE reinstalls its bundled
 version, so download the latest EXE before a manual update.
 
+## Copies downloaded before the GitHub rename
+
+The repository is now **MeticulousTransformer/CapForge**. If you installed a
+build downloaded before this rename, download the current DMG or EXE once from
+the links above and run Setup. The earlier updater checks the old repository
+address exactly and cannot accept the renamed release assets. Your keys and
+exports are preserved. After this installation, in-app updates use the new address.
+
 ## Moving from v0.3.2
 
-The release retains `CapForge-0.3.3.zip` and its checksum for the older updater.
+Use the manual update above if your installed copy still uses the old GitHub
+address. The release retains `CapForge-0.3.3.zip` and its checksum for compatibility
+with the older installer entry point.
 On Mac, that migration package hands the old Python entry point to the bundled
 native app. On Windows, the earlier guided installer handles this one update.
 Afterward, CapForge selects the OS-specific update package automatically.

@@ -1,8 +1,8 @@
 # Your first captions
 
 1. Download your platform's installer from the
-   [CapForge download page](https://meticuloustransformer.github.io/Georgian-Kartuli-After-Effects-Transcribtion-Tool/)
-   or [official release](https://github.com/MeticulousTransformer/Georgian-Kartuli-After-Effects-Transcribtion-Tool/releases/latest).
+   [CapForge download page](https://meticuloustransformer.github.io/CapForge/)
+   or [official release](https://github.com/MeticulousTransformer/CapForge/releases/latest).
    On Mac, open **CapForge-0.3.3-macOS.dmg**, drag **CapForge.app** to Applications,
    and open it there. On Windows, open **CapForge-0.3.3-Windows.exe** directly.
    See the [Mac guide](INSTALL_MAC.md) or [Windows guide](INSTALL_WINDOWS.md).

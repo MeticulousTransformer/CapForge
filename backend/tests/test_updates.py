@@ -16,8 +16,8 @@ import requests
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from services import updates
 
-REPO = "https://github.com/MeticulousTransformer/Georgian-Kartuli-After-Effects-Transcribtion-Tool"
-API = "https://api.github.com/repos/MeticulousTransformer/Georgian-Kartuli-After-Effects-Transcribtion-Tool/releases/latest"
+REPO = "https://github.com/MeticulousTransformer/CapForge"
+API = "https://api.github.com/repos/MeticulousTransformer/CapForge/releases/latest"
 TAG = "kml-1234567"
 VERSION = "0.3.3"
 NAME = "CapForge-0.3.3-macOS.zip"

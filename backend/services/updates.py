@@ -18,7 +18,7 @@ from urllib.parse import quote, urljoin, urlsplit
 
 import requests
 
-REPOSITORY = "MeticulousTransformer/Georgian-Kartuli-After-Effects-Transcribtion-Tool"
+REPOSITORY = "MeticulousTransformer/CapForge"
 LATEST_URL = f"https://api.github.com/repos/{REPOSITORY}/releases/latest"
 MAX_DOWNLOAD_BYTES = 64 * 1024 * 1024
 MAX_EXPANDED_BYTES = 128 * 1024 * 1024

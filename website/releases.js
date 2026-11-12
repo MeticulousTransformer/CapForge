@@ -1,7 +1,7 @@
 /* Only official, fully published platform pairs become download buttons. */
 (function (root) {
     'use strict';
-    var repo = 'MeticulousTransformer/Georgian-Kartuli-After-Effects-Transcribtion-Tool';
+    var repo = 'MeticulousTransformer/CapForge';
     function select(release) {
         if (!release || release.draft || release.prerelease || !/^build-[a-f0-9]{40}$/.test(release.tag_name) || !Array.isArray(release.assets)) return null;
         var mac = release.assets.filter(function (a) { return /^CapForge-\d+\.\d+\.\d+-macOS\.dmg$/.test(a.name); });
