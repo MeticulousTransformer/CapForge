@@ -7,8 +7,6 @@ on:
 
 permissions:
   contents: read
-
-# A newer push supersedes an older build before it can become the latest release.
 concurrency:
   group: capforge-release-kml
   cancel-in-progress: true
@@ -40,60 +38,10 @@ jobs:
         run: python -m pip install -r backend/requirements-lock.txt
       - name: Check all components
         run: python scripts/check_release.py
-      - name: Install from source on a fresh Mac destination
-        if: runner.os == 'macOS'
-        shell: bash
-        run: |
-          runtime="$RUNNER_TEMP/Fresh Mac ქართული/CapForge"
-          extensions="$RUNNER_TEMP/Fresh Mac ქართული/Extensions"
-          ./Install\ macOS.command --headless --target "$runtime" --extension-root "$extensions"
-          "$runtime/.venv/bin/python" -m pip check
-          "$runtime/.venv/bin/python" -I scripts/check_installed_runtime.py "$runtime"
-          test -f "$extensions/com.kartuli.captionforge/CSXS/manifest.xml"
-      - name: Install from source on a fresh Windows destination
-        if: runner.os == 'Windows'
-        shell: pwsh
-        run: |
-          $runtime = Join-Path $env:RUNNER_TEMP 'Fresh Windows ქართული\CapForge'
-          $extensions = Join-Path $env:RUNNER_TEMP 'Fresh Windows ქართული\Extensions'
-          $output = & powershell.exe -NoProfile -ExecutionPolicy Bypass -File installer/bootstrap_windows.ps1 -Headless -BootstrapOnly -RuntimeRoot $runtime
-          if ($LASTEXITCODE -ne 0) { throw 'Private runtime bootstrap failed.' }
-          $python = $output | Select-Object -Last 1
-          if (-not (Test-Path -LiteralPath $python)) { throw 'Private Python was not prepared.' }
-          & $python installer/install.py --headless --target $runtime --extension-root $extensions
-          if ($LASTEXITCODE -ne 0) { throw 'Installation failed.' }
-          $installedPython = Join-Path $runtime '.venv\Scripts\python.exe'
-          & $installedPython -m pip check
-          if ($LASTEXITCODE -ne 0) { throw 'Installed dependencies are inconsistent.' }
-          & $installedPython -I scripts/check_installed_runtime.py $runtime
-          if ($LASTEXITCODE -ne 0) { throw 'Installed runtime or audio support failed.' }
-          if (-not (Test-Path (Join-Path $extensions 'com.kartuli.captionforge\CSXS\manifest.xml'))) { throw 'CEP panel is missing.' }
 
-  package:
+  windows:
     needs: test
     runs-on: windows-latest
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@v7
-        with:
-          persist-credentials: false
-      - uses: actions/setup-python@v7
-        with:
-          python-version: "3.12"
-      - name: Build the ZIP with the native Windows launcher
-        run: python scripts/package_release.py
-      - uses: actions/upload-artifact@v7
-        with:
-          name: capforge-release
-          path: |
-            dist/CapForge-*.zip
-            dist/CapForge-*.zip.sha256
-          if-no-files-found: error
-          retention-days: 14
-
-  verify_download:
-    needs: package
-    runs-on: macos-15
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v7
@@ -102,33 +50,77 @@ jobs:
       - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
-      - uses: actions/setup-node@v7
+      - name: Build shared payload and standalone EXE
+        run: |
+          python scripts/package_release.py --source-only
+          python scripts/build_windows.py --archive dist/CapForge-0.3.3.zip
+          python scripts/package_update.py --archive dist/CapForge-0.3.3.zip --native dist/CapForge-0.3.3-Windows.exe --platform windows --output dist/public/CapForge-0.3.3-Windows.zip
+          Copy-Item dist/CapForge-0.3.3-Windows.exe* dist/public/
+      - name: Install the exact EXE on a fresh Windows destination
+        run: python scripts/check_native_install.py --platform windows --installer dist/public/CapForge-0.3.3-Windows.exe
+      - uses: actions/upload-artifact@v7
         with:
-          node-version: "22"
-          package-manager-cache: false
+          name: capforge-windows
+          path: dist/public/*
+          if-no-files-found: error
+
+  macos:
+    needs: test
+    runs-on: macos-15
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - name: Build universal native app and DMG
+        run: |
+          python scripts/package_release.py --source-only
+          python scripts/build_macos.py --archive dist/CapForge-0.3.3.zip
+          python scripts/package_update.py --archive dist/CapForge-0.3.3.zip --native dist/CapForge.app --platform macos --output dist/public/CapForge-0.3.3-macOS.zip
+          python scripts/package_update.py --archive dist/CapForge-0.3.3.zip --native dist/CapForge.app --platform macos --legacy --output dist/public/CapForge-0.3.3.zip
+          cp dist/CapForge-0.3.3-macOS.dmg* dist/public/
+      - uses: actions/upload-artifact@v7
+        with:
+          name: capforge-macos
+          path: dist/public/*
+          if-no-files-found: error
+
+  verify_macos:
+    needs: macos
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-15, macos-15-intel]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
       - uses: actions/download-artifact@v8
         with:
-          name: capforge-release
+          name: capforge-macos
           path: dist
-      - name: Validate the Windows-built download on Mac
-        shell: bash
+      - name: Verify disk image and install its app
         run: |
-          python -m pip install -r backend/requirements-lock.txt
-          python scripts/check_release.py --archive dist/CapForge-*.zip --require-windows-launcher
-          archives=(dist/CapForge-*.zip)
-          extracted="$RUNNER_TEMP/Downloaded CapForge ქართული"
-          /usr/bin/ditto -x -k "${archives[0]}" "$extracted"
-          package="$extracted/$(basename "${archives[0]}" .zip)"
-          runtime="$RUNNER_TEMP/Fresh Download ქართული/CapForge"
-          extensions="$RUNNER_TEMP/Fresh Download ქართული/Extensions"
-          "$package/Install macOS.command" --headless --target "$runtime" --extension-root "$extensions"
-          "$runtime/.venv/bin/python" -m pip check
-          "$runtime/.venv/bin/python" -I scripts/check_installed_runtime.py "$runtime"
-          test -f "$runtime/release.json"
-          test -f "$extensions/com.kartuli.captionforge/CSXS/manifest.xml"
+          cd dist
+          shasum -a 256 -c CapForge-0.3.3-macOS.dmg.sha256
+          cd ..
+          mount="$RUNNER_TEMP/CapForge mounted"
+          mkdir -p "$mount"
+          hdiutil attach dist/CapForge-0.3.3-macOS.dmg -nobrowse -readonly -mountpoint "$mount"
+          trap 'hdiutil detach "$mount"' EXIT
+          codesign --verify --deep --strict "$mount/CapForge.app"
+          python scripts/check_native_install.py --platform macos --installer "$mount/CapForge.app/Contents/MacOS/CapForge"
 
   release:
-    needs: verify_download
+    needs: [windows, verify_macos]
     if: github.ref == 'refs/heads/kml'
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -137,26 +129,51 @@ jobs:
     steps:
       - uses: actions/download-artifact@v8
         with:
-          name: capforge-release
+          pattern: capforge-*
+          merge-multiple: true
           path: dist
-      - name: Publish this tested commit
+      - name: Publish both native installers together
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
-        shell: bash
         run: |
           latest_commit=$(gh api "repos/$GH_REPO/commits/kml" --jq .sha)
-          if [ "$latest_commit" != "$GITHUB_SHA" ]; then
-            echo 'A newer commit is on kml; this build will not become a release.'
-            exit 0
-          fi
-          if gh release view "$CAPFORGE_RELEASE_TAG" >/dev/null 2>&1; then
-            echo 'This commit already has a release.'
-            exit 0
-          fi
+          test "$latest_commit" = "$GITHUB_SHA" || exit 1
+          if gh release view "$CAPFORGE_RELEASE_TAG" >/dev/null 2>&1; then exit 0; fi
           cat > "$RUNNER_TEMP/release-notes.md" <<'NOTES'
-          Download and extract the CapForge ZIP, then open CapForge Setup.exe on Windows or Install macOS.command on Mac. First setup needs internet and prepares Python, transcription packages, and audio support automatically.
+          ## Choose your computer
 
-          Automated checks passed on Windows and Intel Mac, followed by installation of this exact ZIP on Apple Silicon Mac. This unsigned preview still needs real After Effects playback checks for the AE versions you use.
+          - **Mac:** download `CapForge-0.3.3-macOS.dmg`, open it, drag CapForge to Applications, and open CapForge. [Mac guide](https://github.com/MeticulousTransformer/Georgian-Kartuli-After-Effects-Transcribtion-Tool/blob/kml/docs/INSTALL_MAC.md).
+          - **Windows:** download and open `CapForge-0.3.3-Windows.exe`. No ZIP extraction. [Windows guide](https://github.com/MeticulousTransformer/Georgian-Kartuli-After-Effects-Transcribtion-Tool/blob/kml/docs/INSTALL_WINDOWS.md).
+
+          Both installers share this exact commit and version. First setup needs internet; Python and audio support are prepared privately. Save your AE project and close AE before installation.
+
+          This preview is not Developer-ID notarized or Windows code-signed. OS trust warnings can appear. Adobe unsigned-extension mode is an explicit preview option. See your OS guide.
+
+          Packaged installation passed on Windows, Apple Silicon and Intel Mac. Real AE compatibility and paid transcription should be checked on your own clips.
+
+          The ZIP assets and their checksums support automatic updates and migration from 0.3.2; new users should choose the DMG or EXE above.
           NOTES
-          gh release create "$CAPFORGE_RELEASE_TAG" dist/*.zip dist/*.zip.sha256 --target "$GITHUB_SHA" --title "CapForge build ${GITHUB_SHA:0:7}" --notes-file "$RUNNER_TEMP/release-notes.md" --latest
+          gh release create "$CAPFORGE_RELEASE_TAG" dist/* --target "$GITHUB_SHA" --title "CapForge 0.3.3 · Mac & Windows · ${GITHUB_SHA:0:7}" --notes-file "$RUNNER_TEMP/release-notes.md" --latest
+
+  website:
+    needs: release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          path: website
+      - name: Publish download website
+        id: deployment
+        uses: actions/deploy-pages@v4

@@ -20,18 +20,26 @@ REPO = "https://github.com/MeticulousTransformer/Georgian-Kartuli-After-Effects-
 API = "https://api.github.com/repos/MeticulousTransformer/Georgian-Kartuli-After-Effects-Transcribtion-Tool/releases/latest"
 TAG = "kml-1234567"
 VERSION = "0.3.3"
-NAME = "CapForge-0.3.3.zip"
+NAME = "CapForge-0.3.3-macOS.zip"
 
 
-def package(extra=None, manifest_change=None, release_tag=TAG, missing=None):
+def package(extra=None, manifest_change=None, release_tag=TAG, missing=None,
+            platform="macos", version=VERSION, identity_platform="same"):
     files = {name: b"# release component\n" for name in (
         "installer/install.py", "installer/deployment.py", "installer/environment.py", "installer/theme.py",
         "installer/runtime_assets.json", "installer/service_control.py", "backend/app.py", "backend/requirements.txt",
         "panel/CSXS/manifest.xml", "panel/host.jsx", "ae/lib/json2.js", "run_backend.sh", "run_backend.bat"
     )}
+    if platform:
+        files[updates.NATIVE_SETUP[platform]] = b"native setup binary"
     if missing:
         del files[missing]
-    files["release.json"] = json.dumps({"version": VERSION, "tag": release_tag, "commit": "a" * 40}).encode()
+    identity = {"version": version, "tag": release_tag, "commit": "a" * 40}
+    if identity_platform == "same":
+        identity_platform = platform
+    if identity_platform is not None:
+        identity["platform"] = identity_platform
+    files["release.json"] = json.dumps(identity).encode()
     manifest = [{"path": name, "bytes": len(data), "sha256": hashlib.sha256(data).hexdigest()} for name, data in files.items()]
     if manifest_change:
         manifest_change(manifest)
@@ -39,7 +47,7 @@ def package(extra=None, manifest_change=None, release_tag=TAG, missing=None):
     output = io.BytesIO()
     with zipfile.ZipFile(output, "w", zipfile.ZIP_DEFLATED) as archive:
         for name, data in files.items():
-            archive.writestr("CapForge-0.3.3/" + name, data)
+            archive.writestr("CapForge-" + version + "/" + name, data)
         if extra:
             name, data, mode = extra
             info = zipfile.ZipInfo(name)
@@ -50,13 +58,14 @@ def package(extra=None, manifest_change=None, release_tag=TAG, missing=None):
 
 class ReleaseNetwork:
     """Only the network boundary is replaced; Response parsing stays real."""
-    def __init__(self, archive):
+    def __init__(self, archive, platform="macos", version=VERSION):
         prefix = REPO + "/releases/download/" + TAG + "/"
+        name = "CapForge-" + version + ({"macos": "-macOS", "windows": "-Windows"}.get(platform, "")) + ".zip"
         self.release = {"tag_name": TAG, "draft": False, "prerelease": False, "body": "Startup improvements.", "assets": [
-            {"name": NAME, "browser_download_url": prefix + NAME, "size": len(archive)},
-            {"name": NAME + ".sha256", "browser_download_url": prefix + NAME + ".sha256", "size": 100}
+            {"name": name, "browser_download_url": prefix + name, "size": len(archive)},
+            {"name": name + ".sha256", "browser_download_url": prefix + name + ".sha256", "size": 100}
         ]}
-        self.data = {prefix + NAME: archive, prefix + NAME + ".sha256": (hashlib.sha256(archive).hexdigest() + "  " + NAME + "\n").encode()}
+        self.data = {prefix + name: archive, prefix + name + ".sha256": (hashlib.sha256(archive).hexdigest() + "  " + name + "\n").encode()}
         self.calls = []
 
     def get(self, url, **kwargs):
@@ -90,8 +99,11 @@ class TestUpdates(unittest.TestCase):
         self.http.start()
         self.process = patch.object(updates, "_installer_process", None)
         self.process.start()
+        self.platform = patch.object(updates, "_platform", return_value="macos")
+        self.platform.start()
 
     def tearDown(self):
+        self.platform.stop()
         self.base_override.stop()
         self.process.stop()
         self.http.stop()
@@ -182,15 +194,95 @@ class TestUpdates(unittest.TestCase):
         self.assertTrue(result["started"])
         self.assertEqual(result["tag"], TAG)
         command = launch.call_args.args[0]
-        self.assertEqual(command[0], str(self.base_python))
-        self.assertEqual(command[2:], ["--target", str(self.root), "--extension-root", str(self.extension.parent)])
-        script = Path(command[1])
-        self.assertTrue(script.is_file())
-        self.assertIn(self.root / ".updates", script.parents)
-        self.assertEqual(json.loads((script.parents[1] / "release.json").read_text())["tag"], TAG)
+        self.assertEqual(command[1:], ["--target", str(self.root), "--extension-root", str(self.extension.parent)])
+        executable = Path(command[0])
+        self.assertTrue(executable.is_file())
+        self.assertEqual(executable.relative_to(Path(launch.call_args.kwargs["cwd"])).as_posix(), updates.NATIVE_SETUP["macos"])
+        self.assertIn(self.root / ".updates", executable.parents)
+        self.assertEqual(json.loads((Path(launch.call_args.kwargs["cwd"]) / "release.json").read_text())["tag"], TAG)
+        self.assertNotIn("--headless", command)
+        if sys.platform != "win32":
+            self.assertEqual(stat.S_IMODE(executable.stat().st_mode), 0o755)
         self.assertFalse((self.root / "backend").exists(), "Only the installer may replace runtime files")
 
-    def test_wizard_never_uses_a_missing_or_external_python(self):
+    def use_legacy_release(self):
+        self.network = ReleaseNetwork(package(platform=None, version="0.3.2"), platform=None, version="0.3.2")
+
+    def test_native_setup_repairs_a_missing_private_python(self):
+        self.base_python.unlink()
+        with patch.object(updates.subprocess, "Popen", return_value=SimpleNamespace(poll=lambda: None)) as launch:
+            self.assertTrue(updates.install(self.root, "0.3.2")["started"])
+        self.assertTrue(launch.call_args.args[0][0].endswith(updates.NATIVE_SETUP["macos"]))
+
+    def test_native_setup_launch_keeps_installed_keys_and_exports_untouched(self):
+        for name in ("backend/.env", "backend/.local-token", "exports/normalized.json"):
+            file = self.root / name
+            file.parent.mkdir(exist_ok=True)
+            file.write_text("keep " + name)
+        with patch.object(updates.subprocess, "Popen", return_value=SimpleNamespace(poll=lambda: None)):
+            updates.install(self.root, "0.3.2")
+        for name in ("backend/.env", "backend/.local-token", "exports/normalized.json"):
+            self.assertEqual((self.root / name).read_text(), "keep " + name)
+
+    def test_current_os_is_selected_from_both_native_assets_and_migration_archive(self):
+        windows = ReleaseNetwork(package(platform="windows"), platform="windows")
+        compatibility = ReleaseNetwork(package(platform=None), platform=None)
+        self.network.release["assets"].extend(windows.release["assets"] + compatibility.release["assets"])
+        self.assertEqual(updates._latest()["archive"]["name"], NAME)
+        with patch.object(updates, "_platform", return_value="windows"):
+            release = updates._latest()
+        self.assertEqual(release["archive"]["name"], "CapForge-0.3.3-Windows.zip")
+        self.assertEqual(release["platform"], "windows")
+
+    def test_wrong_os_or_new_legacy_only_release_cannot_be_selected(self):
+        for platform in ("windows", None):
+            with self.subTest(platform=platform):
+                self.network = ReleaseNetwork(package(platform=platform), platform=platform)
+                with self.assertRaises(updates.UpdateError):
+                    updates.check(self.root, "0.3.2")
+                self.assertEqual(self.network.calls, [API])
+
+    def test_native_asset_without_its_checksum_does_not_fall_back(self):
+        self.network.release["assets"].pop()
+        legacy = ReleaseNetwork(package(platform=None, version="0.3.2"), platform=None, version="0.3.2")
+        self.network.release["assets"].extend(legacy.release["assets"])
+        with self.assertRaises(updates.UpdateError):
+            updates.check(self.root, "0.3.2")
+
+    def test_windows_setup_launches_exe_with_existing_destinations(self):
+        self.network = ReleaseNetwork(package(platform="windows"), platform="windows")
+        with patch.object(updates, "_platform", return_value="windows"), patch.object(updates.subprocess, "Popen", return_value=SimpleNamespace(poll=lambda: None)) as launch:
+            self.assertTrue(updates.install(self.root, "0.3.2")["started"])
+        command = launch.call_args.args[0]
+        self.assertTrue(command[0].endswith("CapForge Setup.exe"))
+        self.assertEqual(command[1:], ["--target", str(self.root), "--extension-root", str(self.extension.parent)])
+        self.assertNotIn("shell", launch.call_args.kwargs)
+
+    def test_native_package_requires_matching_platform_identity_and_executable(self):
+        cases = [package(identity_platform="windows"), package(identity_platform=None),
+                 package(missing=updates.NATIVE_SETUP["macos"])]
+        for archive in cases:
+            self.network = ReleaseNetwork(archive)
+            with patch.object(updates.subprocess, "Popen") as launch:
+                with self.assertRaises(updates.UpdateError):
+                    updates.install(self.root, "0.3.2")
+                launch.assert_not_called()
+
+    def test_unpack_rejects_a_release_for_a_different_os(self):
+        with self.assertRaisesRegex(updates.UpdateError, "different operating system"):
+            updates._unpack(None, self.root, {"version": VERSION, "platform": "windows"})
+
+    def test_legacy_release_uses_its_private_python(self):
+        self.use_legacy_release()
+        with patch.object(updates.subprocess, "Popen", return_value=SimpleNamespace(poll=lambda: None)) as launch:
+            self.assertTrue(updates.install(self.root, "0.3.2")["started"])
+        command = launch.call_args.args[0]
+        self.assertEqual(command[0], str(self.base_python))
+        self.assertTrue(command[1].endswith("installer/install.py"))
+        self.assertEqual(command[2:], ["--target", str(self.root), "--extension-root", str(self.extension.parent)])
+
+    def test_legacy_wizard_never_uses_a_missing_or_external_python(self):
+        self.use_legacy_release()
         (Path(self.temp.name) / "outside-python").touch()
         for python in [self.root / ".runtime/missing-python", Path(self.temp.name) / "outside-python"]:
             with self.subTest(python=python), patch.object(sys, "_base_executable", str(python)), patch.object(updates.subprocess, "Popen") as launch:
@@ -199,6 +291,7 @@ class TestUpdates(unittest.TestCase):
                 launch.assert_not_called()
 
     def test_private_python_accepts_a_capitalization_alias_inside_the_owned_runtime(self):
+        self.use_legacy_release()
         alias = self.root.with_name(self.root.name.swapcase())
         if not alias.exists():
             self.skipTest("This filesystem distinguishes filename capitalization")

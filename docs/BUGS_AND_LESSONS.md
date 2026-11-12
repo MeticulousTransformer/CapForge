@@ -301,3 +301,52 @@ separate task with its own acceptance check.
    transcribe a short Georgian clip, correct a word and generate captions.
    Record where they stop or misunderstand a message. Use those observations
    to choose the next small improvement rather than adding controls blindly.
+
+## 14. The download is part of the program
+
+A Mac editor expects an app they can drag to Applications. A Windows editor
+expects an EXE they can open. CapForge now gives each system its own entry point:
+the Mac app owns its setup window, while the Windows EXE carries and unpacks its
+setup files. Both reach the same installation code for ownership checks, backups,
+and preserving keys. The caption engine and normalized word timeline stay shared.
+This is a useful boundary: separate the parts that the operating system needs,
+and keep the common work in one place.
+
+That separation also applies to updates. A Mac must select the Mac package;
+Windows must select the Windows package. Each verified package carries its
+version, source commit, file hashes, and native setup executable. These checks
+help catch a wrong or incomplete download before Setup opens. An older Mac app
+also checks whether the installed release is newer before repairing it, so an
+old copy in Applications does not quietly undo an update.
+
+A source-folder test can miss a file that was left out of the download. The
+[packaged installation check](../scripts/check_native_install.py) therefore starts
+the shipped executable, uses a fresh destination, and checks the installed
+runtime and release identity. The workflow requires the Windows EXE and the Mac
+DMG to work on their respective systems, including both Mac architectures.
+Passing local tests does not establish that this remote release gate has passed.
+
+The fresh-folder test exposed a small Mac path trap. A temporary folder can be
+named under `/var`, while that system path points to `/private/var`. The installer
+deliberately rejects symbolic links in destination paths. It therefore rejected
+the test's own temporary path before installation began. The narrow repair was
+to resolve the temporary folder created by the test:
+
+```python
+test_root = Path(folder).resolve()
+```
+
+`resolve()` finds the physical path. Here the test controls the folder it just
+created, so using that path is appropriate. The installer's checks for arbitrary
+user-supplied links remain in place. A failing test can reveal a mistake in its
+setup as well as in the application.
+
+Finally, a working installer and a trusted publisher are separate requirements.
+Executable permissions allow a file to run. Signing with a trusted publisher
+certificate identifies its publisher; Apple notarization adds Apple's checking
+process. Building an app or adding an
+execute bit does not supply a developer certificate. This preview can therefore
+install correctly and still show an OS trust prompt. The
+[Mac](INSTALL_MAC.md) and [Windows](INSTALL_WINDOWS.md) guides explain that status
+and the available per-app choices. Keep evidence equally specific: package tests
+show installation behavior; desktop checks show the actual opening experience.

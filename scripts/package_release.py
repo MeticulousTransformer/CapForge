@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import hashlib
+import argparse
 import json
 import os
 import re
@@ -11,10 +12,10 @@ import zipfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-NAME = "CapForge-0.3.2"
+NAME = "CapForge-0.3.3"
 FOLDERS = ("panel", "ae", "backend", "installer", "agents", "docs", "scripts")
 FILES = ("README.md", "AGENTS.md", "LICENSE", "Install Windows.cmd", "Install macOS.command", "run_backend.bat", "run_backend.sh")
-EXTENSIONS = {".py", ".ps1", ".sh", ".cs", ".jsx", ".js", ".html", ".css", ".xml", ".md", ".txt", ".example"}
+EXTENSIONS = {".py", ".ps1", ".sh", ".cs", ".swift", ".jsx", ".js", ".html", ".css", ".xml", ".md", ".txt", ".example"}
 # Data files are individually allowed: arbitrary JSON/env files may hold keys.
 DATA_FILES = {
     "backend/config.example.env", "installer/runtime_assets.json", "docs/studio-narrow.png",
@@ -65,11 +66,16 @@ def release_identity():
     tag = os.environ.get("CAPFORGE_RELEASE_TAG", "local-" + commit)
     if not re.fullmatch(r"[A-Za-z0-9._-]{1,160}", tag):
         raise ValueError("Invalid release tag.")
-    return {"version": NAME.removeprefix("CapForge-"), "tag": tag, "commit": commit}
+    # Commit time is shared by both OS builds; wall-clock build times are not.
+    result = subprocess.run(["git", "show", "-s", "--format=%ct", commit], cwd=ROOT, capture_output=True, text=True)
+    built_at = int(result.stdout.strip()) if result.returncode == 0 and result.stdout.strip().isdigit() else 0
+    return {"version": NAME.removeprefix("CapForge-"), "tag": tag, "commit": commit, "builtAt": built_at}
 
 
-def build_archive(archive):
+def build_archive(archive, *, source_only=False):
     paths = list(members())
+    if source_only:
+        paths = [path for path in paths if path.suffix.lower() != ".exe"]
     included = {path.relative_to(ROOT).as_posix() for path in paths}
     for name in REQUIRED:
         path = ROOT / name
@@ -95,14 +101,17 @@ def build_archive(archive):
 
 
 def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--source-only", action="store_true", help="Payload for native installers, without an embedded Windows launcher")
+    args = parser.parse_args()
     from sync_preview_styles import build
     build()
-    if sys.platform == "win32":
+    if sys.platform == "win32" and not args.source_only:
         subprocess.run(["powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", str(ROOT / "scripts/build_windows_launcher.ps1")], check=True)
     destination = ROOT / "dist"
     destination.mkdir(exist_ok=True)
     archive = destination / (NAME + ".zip")
-    manifest = build_archive(archive)
+    manifest = build_archive(archive, source_only=args.source_only)
     checksum = hashlib.sha256(archive.read_bytes()).hexdigest()
     archive.with_suffix(".zip.sha256").write_text(checksum + "  " + archive.name + "\n", encoding="utf-8")
     print(f"Created {archive}\n{len(manifest)} files · {archive.stat().st_size:,} bytes")

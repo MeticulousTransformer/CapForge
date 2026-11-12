@@ -1,7 +1,7 @@
 /* Local service only. The install-specific token stays in memory, never storage. */
 (function (root) {
     "use strict";
-    var serviceVersion = "0.3.2";
+    var serviceVersion = "0.3.3";
     var token = "", base = "http://127.0.0.1:8765";
     function request(path, payload) {
         var headers = { "Content-Type": "application/json" };

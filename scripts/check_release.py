@@ -107,7 +107,7 @@ def main() -> None:
     print("Checking CapForge " + version, flush=True)
     for folder in ("backend/tests", "installer/tests", "scripts/tests"):
         run([sys.executable, "-m", "unittest", "discover", "-s", folder, "-v"])
-    for folder in ("ae/tests", "panel/tests"):
+    for folder in ("ae/tests", "panel/tests", "scripts/tests"):
         for file in sorted((ROOT / folder).glob("test_*.js")):
             run(["node", str(file)])
     if sys.platform == "win32":

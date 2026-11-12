@@ -17,7 +17,7 @@ test('panel requires a restart before connecting to an older running service', a
 });
 
 test('panel accepts current service health and leaves other API payloads intact', async () => {
-    const health = {ok: true, version: '0.3.2', ffmpeg: true};
+    const health = {ok: true, version: '0.3.3', ffmpeg: true};
     assert.deepEqual(await api(health).request('/health'), health);
     const result = {providers: []};
     assert.deepEqual(await api(result).request('/providers'), result);
@@ -47,7 +47,7 @@ test('health timeout is cleared on success; transcription is not cut off by the 
     vm.runInNewContext(fs.readFileSync(path.join(__dirname, '../js/api.js'), 'utf8'), {
         window, AbortController,
         setTimeout: () => ++scheduled, clearTimeout: () => ++cleared,
-        fetch: async () => ({ok: true, json: async () => ({version: '0.3.2'})})
+        fetch: async () => ({ok: true, json: async () => ({version: '0.3.3'})})
     });
     await window.KCF_API.request('/health');
     assert.equal(scheduled, 1); assert.equal(cleared, 1);
@@ -60,7 +60,7 @@ test('older browser hosts without AbortController can connect and still time out
     let timer, stalled = false;
     vm.runInNewContext(fs.readFileSync(path.join(__dirname, '../js/api.js'), 'utf8'), {
         window, setTimeout: fn => {timer = fn; return 1;}, clearTimeout() {},
-        fetch: () => stalled ? new Promise(() => {}) : Promise.resolve({ok: true, json: async () => ({version: '0.3.2'})})
+        fetch: () => stalled ? new Promise(() => {}) : Promise.resolve({ok: true, json: async () => ({version: '0.3.3'})})
     });
     await window.KCF_API.request('/health');
     stalled = true;

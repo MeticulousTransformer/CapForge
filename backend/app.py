@@ -14,7 +14,7 @@ from threading import Lock
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-VERSION = "0.3.2"
+VERSION = "0.3.3"
 BACKEND_DIR = os.path.dirname(os.path.abspath(__file__))
 EXPORTS_DIR = os.path.join(os.path.dirname(BACKEND_DIR), "exports")
 

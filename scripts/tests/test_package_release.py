@@ -81,7 +81,7 @@ class ReleaseTests(unittest.TestCase):
         with zipfile.ZipFile(archive) as release:
             prefix = package.NAME + "/"
             identity = json.loads(release.read(prefix + "release.json"))
-            self.assertEqual(identity, {"version": "0.3.2", "tag": "build-" + commit, "commit": commit})
+            self.assertEqual(identity, {"version": "0.3.3", "tag": "build-" + commit, "commit": commit, "builtAt": 0})
             manifest = json.loads(release.read(prefix + "package-manifest.json"))
             self.assertIn("release.json", [entry["path"] for entry in manifest])
 

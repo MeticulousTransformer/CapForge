@@ -179,3 +179,16 @@ test("the host rejects coerced timestamps and malformed word content before gene
     }
     assert.equal(generated, 0);
 });
+
+test('Mac background service arguments preserve Unicode and shell punctuation', {skip: process.platform === 'win32'}, () => {
+    const context = host();
+    const {execFileSync} = require('node:child_process');
+    const value = "/tmp/ქართული editor's $(touch SHOULD_NOT_EXIST) $HOME #1";
+    const quoted = context.KCF_shellQuote(value);
+    assert.equal(execFileSync('/bin/sh', ['-c', 'printf %s ' + quoted], {encoding:'utf8'}), value);
+    const command = context.KCF_macServiceCommand(value);
+    assert.ok(command.startsWith('/usr/bin/nohup '));
+    assert.ok(command.includes(context.KCF_shellQuote(value+'/.venv/bin/python')));
+    assert.ok(command.includes(context.KCF_shellQuote(value+'/backend/start_service.py')));
+    assert.ok(command.endsWith('2>&1 < /dev/null &'));
+});

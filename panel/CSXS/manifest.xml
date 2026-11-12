@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<ExtensionManifest Version="7.0" ExtensionBundleId="com.kartuli.captionforge" ExtensionBundleVersion="0.3.2" ExtensionBundleName="CapForge">
-  <ExtensionList><Extension Id="com.kartuli.captionforge.panel" Version="0.3.2" /></ExtensionList>
+<ExtensionManifest Version="7.0" ExtensionBundleId="com.kartuli.captionforge" ExtensionBundleVersion="0.3.3" ExtensionBundleName="CapForge">
+  <ExtensionList><Extension Id="com.kartuli.captionforge.panel" Version="0.3.3" /></ExtensionList>
   <ExecutionEnvironment>
     <HostList><Host Name="AEFT" Version="[16.0,99.9]" /></HostList>
     <LocaleList><Locale Code="All" /></LocaleList>

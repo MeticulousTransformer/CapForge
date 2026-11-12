@@ -14,6 +14,19 @@ from environment import data_root, diagnostics, extension_root
 import theme
 
 
+def native_macos_setup(arguments: list[str]) -> int | None:
+    """Older updaters enter here through Python; keep their process tracked."""
+    app = Path(__file__).resolve().parents[1] / "CapForge.app"
+    if sys.platform != "darwin" or not app.exists():
+        return None
+    executable = app / "Contents/MacOS/CapForge"
+    if app.is_symlink() or executable.is_symlink() or not executable.is_file() or app.resolve() not in executable.resolve().parents:
+        raise RuntimeError("The native CapForge Setup application is incomplete. Download the macOS package again.")
+    # The previous updater restored execute bits only for .sh and .command.
+    executable.chmod(0o755)
+    return subprocess.call([str(executable), *arguments], cwd=str(app.parent))
+
+
 def wizard(target: Path | None = None, extensions: Path | None = None) -> None:
     runtime = target or data_root()
     try:
@@ -123,6 +136,9 @@ def main() -> int:
     elif args.headless:
         install(args.target, args.extension_root, dependencies=not args.skip_dependencies, unsigned=args.enable_unsigned)
     else:
+        result = native_macos_setup(sys.argv[1:])
+        if result is not None:
+            return result
         wizard(args.target, args.extension_root)
     return 0
 

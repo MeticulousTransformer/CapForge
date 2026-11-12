@@ -22,6 +22,11 @@ REPOSITORY = "MeticulousTransformer/Georgian-Kartuli-After-Effects-Transcribtion
 LATEST_URL = f"https://api.github.com/repos/{REPOSITORY}/releases/latest"
 MAX_DOWNLOAD_BYTES = 64 * 1024 * 1024
 MAX_EXPANDED_BYTES = 128 * 1024 * 1024
+NATIVE_SETUP = {
+    "macos": "CapForge.app/Contents/MacOS/CapForge",
+    "windows": "CapForge Setup.exe",
+}
+SPLIT_RELEASE_VERSION = (0, 3, 3)
 REQUIRED_FILES = {
     "installer/install.py", "installer/deployment.py", "installer/environment.py", "installer/theme.py",
     "installer/runtime_assets.json", "installer/service_control.py", "backend/app.py", "backend/requirements.txt",
@@ -115,7 +120,16 @@ def _latest():
         if not isinstance(tag, str) or not tag or len(tag) > 200 or release.get("draft") or release.get("prerelease"):
             raise ValueError("Invalid public release")
         assets = release["assets"]
-        packages = [a for a in assets if re.fullmatch(r"CapForge-(\d+\.\d+\.\d+)\.zip", a.get("name", ""))]
+        platform = _platform()
+        suffix = {"macos": "macOS", "windows": "Windows"}[platform]
+        pattern = rf"CapForge-(\d+\.\d+\.\d+)-{suffix}\.zip"
+        packages = [a for a in assets if re.fullmatch(pattern, a.get("name", ""))]
+        if not packages:
+            # Only releases from before native Setup may use the shared package.
+            pattern = r"CapForge-(\d+\.\d+\.\d+)\.zip"
+            packages = [a for a in assets if re.fullmatch(pattern, a.get("name", ""))
+                        and tuple(map(int, re.fullmatch(pattern, a["name"]).group(1).split("."))) < SPLIT_RELEASE_VERSION]
+            platform = None
         if len(packages) != 1:
             raise ValueError("Missing release package")
         archive = packages[0]
@@ -127,10 +141,19 @@ def _latest():
             expected = f"https://github.com/{REPOSITORY}/releases/download/{quote(tag, safe='')}/{asset['name']}"
             if asset.get("browser_download_url") != expected or not isinstance(asset.get("size"), int) or not 0 < asset["size"] <= MAX_DOWNLOAD_BYTES:
                 raise ValueError("Invalid release asset")
-        version = re.fullmatch(r"CapForge-(\d+\.\d+\.\d+)\.zip", archive["name"]).group(1)
-        return {"version": version, "tag": tag, "notes": str(release.get("body") or "")[:12000], "archive": archive, "checksum": checksum}
+        version = re.fullmatch(pattern, archive["name"]).group(1)
+        return {"version": version, "tag": tag, "platform": platform,
+                "notes": str(release.get("body") or "")[:12000], "archive": archive, "checksum": checksum}
     except (ValueError, TypeError, KeyError, AttributeError) as error:
         raise UpdateError("The latest release does not contain a complete verified CapForge update yet. Try again later.", 502) from error
+
+
+def _platform():
+    if sys.platform == "darwin":
+        return "macos"
+    if sys.platform == "win32":
+        return "windows"
+    raise UpdateError("CapForge Setup supports macOS and Windows.")
 
 
 def _status(root, current_version, release):
@@ -155,6 +178,9 @@ def check(root, current_version):
 
 def _unpack(archive_path, destination, release):
     prefix = "CapForge-" + release["version"]
+    platform = release.get("platform")
+    if platform is not None and platform != _platform():
+        raise UpdateError("The update package is for a different operating system.")
     files, seen, total = {}, set(), 0
     try:
         with zipfile.ZipFile(archive_path) as archive:
@@ -174,6 +200,8 @@ def _unpack(archive_path, destination, release):
                     files["/".join(parts[1:])] = info
             if not REQUIRED_FILES.issubset(files) or "package-manifest.json" not in files:
                 raise UpdateError("The update package is missing required installer files.")
+            if platform and NATIVE_SETUP[platform] not in files:
+                raise UpdateError("The update package is missing its native Setup application.")
             manifest = json.loads(archive.read(files["package-manifest.json"]))
             if not isinstance(manifest, list):
                 raise ValueError("Invalid manifest")
@@ -191,13 +219,15 @@ def _unpack(archive_path, destination, release):
             identity = json.loads(archive.read(files["release.json"]))
             if identity.get("tag") != release["tag"] or identity.get("version") != release["version"] or not re.fullmatch(r"[a-f0-9]{40}", identity.get("commit", "")):
                 raise ValueError("Wrong release identity")
+            if identity.get("platform") != platform:
+                raise ValueError("Wrong release platform")
             package_root = destination / prefix
             for name, info in files.items():
                 output = package_root / name
                 output.parent.mkdir(parents=True, exist_ok=True)
                 with output.open("xb") as handle:
                     handle.write(archive.read(info))
-                if output.suffix in {".command", ".sh"}:
+                if output.suffix in {".command", ".sh"} or name == NATIVE_SETUP["macos"]:
                     output.chmod(0o755)
             return package_root
     except (zipfile.BadZipFile, ValueError, KeyError, TypeError, AttributeError, RuntimeError) as error:
@@ -215,13 +245,17 @@ def install(root, current_version):
         if _installer_process is not None and _installer_process.poll() is None:
             raise UpdateError("The update installer is already open. Finish or close it first.", 409)
         root, extensions = _owned(root)
-        runtime = root / ".runtime"
-        python = Path(getattr(sys, "_base_executable", "")).resolve()
-        if runtime.is_symlink() or not python.is_file() or not any(_same_directory(str(parent), runtime) for parent in python.parents):
-            raise UpdateError("CapForge's private setup runtime is unavailable. Run the CapForge installer once to repair it.")
         release = _latest()
         if not _status(root, current_version, release)["available"]:
             raise UpdateError("There is no newer CapForge update to install.")
+        runtime = root / ".runtime"
+        if runtime.is_symlink():
+            raise UpdateError("CapForge's private runtime folder is a symbolic link. Run the CapForge installer to repair it.")
+        python = None
+        if not release.get("platform"):
+            python = Path(getattr(sys, "_base_executable", "")).resolve()
+            if not python.is_file() or not any(_same_directory(str(parent), runtime) for parent in python.parents):
+                raise UpdateError("CapForge's private setup runtime is unavailable. Run the CapForge installer once to repair it.")
         updates_root = root / ".updates"
         if updates_root.is_symlink():
             raise UpdateError("The update folder is a symbolic link. Run CapForge Setup to repair it.")
@@ -237,7 +271,11 @@ def install(root, current_version):
         archive_path = stage / archive_name
         archive_path.write_bytes(archive)
         package_root = _unpack(archive_path, stage, release)
-        command = [str(python), str(package_root / "installer/install.py"), "--target", str(root), "--extension-root", str(extensions)]
+        if release.get("platform"):
+            command = [str(package_root / NATIVE_SETUP[release["platform"]])]
+        else:
+            command = [str(python), str(package_root / "installer/install.py")]
+        command.extend(["--target", str(root), "--extension-root", str(extensions)])
         options = {"cwd": str(package_root), "stdin": subprocess.DEVNULL, "stderr": subprocess.STDOUT}
         if os.name == "nt":
             options["creationflags"] = subprocess.CREATE_NO_WINDOW

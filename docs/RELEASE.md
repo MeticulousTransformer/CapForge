@@ -1,48 +1,78 @@
-# Release candidate → commercial distribution
+# CapForge v0.3.3 distribution
 
-This implementation is **v0.3.2, an unsigned distribution**. The local Mac
-bootstrap and AE 26.5 engine have been exercised; see `VALIDATION.md` for the
-evidence and its limits. A ZIP is not an Apple-notarized or Adobe-signed package.
+v0.3.3 introduces separate native downloads for editors:
 
-Create the clean source package:
+| Computer | Public download | First action |
+| --- | --- | --- |
+| Intel or Apple Silicon Mac | `CapForge-0.3.3-macOS.dmg` | Drag CapForge.app to Applications and open it |
+| Windows | `CapForge-0.3.3-Windows.exe` | Open the standalone installer |
 
-```text
-python scripts/check_release.py --package
-```
+The [download page](https://meticuloustransformer.github.io/Georgian-Kartuli-After-Effects-Transcribtion-Tool/)
+links to [official GitHub release assets](https://github.com/MeticulousTransformer/Georgian-Kartuli-After-Effects-Transcribtion-Tool/releases/latest).
+Editor instructions are in [Install on Mac](INSTALL_MAC.md),
+[Install on Windows](INSTALL_WINDOWS.md), and [Your first captions](QUICK_START.md).
+The version described here is published only after the release workflow succeeds;
+local implementation and tests are not publication evidence.
+
+The Mac app contains a universal native executable and its setup resources. The
+Windows EXE embeds the verified setup payload and extracts it automatically.
+First setup downloads a private runtime and transcription dependencies. It does
+not require users to install Python, FFmpeg, or certificates, or alter PATH.
+
+## Build and publish
+
+Run `python scripts/check_release.py`, then create the allowlisted shared payload
+with `python scripts/package_release.py --source-only`. Build the public downloads
+with `scripts/build_macos.py` and `scripts/build_windows.py` on their respective
+platforms. See [Updating CapForge](UPDATES.md) for commands.
 
 The allowlist excludes `.env`, tokens, exports, models, `.venv`, Git history,
-presentation build folders and other local artifacts. The ZIP includes the
-offline design demo, guided installers, caption engine, backend, fixtures and
-agent documentation. Runtime updates preserve keys and exports.
+and local build artifacts. The payload includes the caption engine, panel,
+backend, offline design demo, installer resources, fixtures, and documentation.
+Each package records its version and source commit. Runtime updates preserve
+keys, exports, saved looks, and owned installation locations.
 
-Pushing to `kml` runs `.github/workflows/release.yml`. It checks Windows and Intel
-Mac, builds the Windows EXE, tests that exact archive on Apple Silicon, and
-publishes it for the in-app update check only after passing. See `UPDATES.md`.
-These workflow files must be pushed before automated publishing is active.
+Pushing to `kml` starts `.github/workflows/release.yml`. Both native builds use
+the same source commit and version. Publishing requires packaged installation
+checks on Windows, Apple Silicon Mac, and Intel Mac. Both public downloads are
+published together after those gates pass. An older workflow cannot supersede
+a newer `kml` commit. Check the workflow and release itself to establish that a
+particular build passed; `VALIDATION.md` records separate historical evidence.
 
-Before selling:
+The release also contains OS-specific update ZIPs and SHA-256 companions. A
+shared `CapForge-0.3.3.zip` exists only for migration from the v0.3.2 updater.
+The download page directs new users to the DMG or EXE.
 
-- Sign the CEP extension using Adobe's signing workflow and ship an installer
-  that does not enable PlayerDebugMode. This preview setting permits **all**
-  unsigned Adobe extensions for that user, not just this panel.
-- Test installation and restart on clean Windows and macOS systems with each
-  AE version advertised. Font enumeration is optional on older AE; users can
-  type a PostScript font name. The manifest range is not proof of compatibility.
-- Validate cloud Georgian transcription and real AE playback on a 10–20 second
-  clip. Check all title styles, portraits, multi-line captions and font weights.
-- Verify macOS `.command` launch permissions/Gatekeeper behavior in the final
-  downloaded distribution. The launchers automatically prepare the runtime;
-  validate this flow on clean Mac and Windows systems, including download failures.
-- Sign a final native installer. The preview uses `.cmd`/`.command` launchers
-  that download a pinned, SHA-256-verified uv distribution, then obtain a private
-  Python runtime with no system PATH changes. Audio support comes from the
-  `imageio-ffmpeg` wheel. Document these third-party dependencies and their licenses.
-- Publish accurate supported-provider/model and AE compatibility information.
-  Do not claim all providers have equal Georgian accuracy.
-- Keep credentials local, document cloud audio processing, and consider the
-  operating system's credential vault before broad commercial release.
-- Provide a support route, version policy, pricing and a real recorded demo.
-  None are invented by this code change. The existing MIT license remains.
+## Preview signing and remaining acceptance
+
+This preview has no Apple Developer ID or Windows publisher certificate. The
+Mac app uses an ad-hoc signature and is **not Apple notarized**. Windows may show
+an unknown-publisher warning. Native packaging does not remove those warnings.
+The editor guides explain the OS-specific prompts without installing certificates
+or disabling protection globally.
+
+The Adobe panel is also unsigned. Setup exposes an explicit unsigned-extension
+option; enabling it permits all unsigned Adobe panels for that user. A production
+Adobe-signed package should not depend on that preview option.
+
+Before describing this as a commercial, fully validated release:
+
+- Test the downloaded artifacts on clean systems, including first-launch trust
+  prompts, failed downloads, retry, update, and repair. CI installation checks do
+  not reproduce every desktop security prompt.
+- Verify real AE installation, restart, and playback for every supported AE
+  version. The CEP manifest range alone does not prove compatibility.
+- Validate Georgian transcription and word timing on a 10–20 second clip,
+  including styles, portraits, multiline captions, and font weights. Record actual
+  demonstrations and screenshots; do not substitute mockups as test evidence.
+- Arrange Apple signing/notarization, Windows publisher signing, and Adobe
+  signing for a signed release, and verify the final downloaded artifacts again.
+- Document shipped dependencies and licenses. The bootstrap uses pinned,
+  SHA-256-verified uv archives and private Python; audio support comes from
+  `imageio-ffmpeg`.
+- Publish accurate provider and AE compatibility information, cloud-audio handling,
+  and a support route. Provider accounts and paid transcription remain separate
+  from installation. The existing MIT license remains.
 
 Technical references: [Adobe CEP resources](https://github.com/Adobe-CEP/CEP-Resources)
-and [Adobe CEP 12 cookbook](https://github.com/Adobe-CEP/CEP-Resources/blob/master/CEP_12.x/Documentation/CEP%2012%20HTML%20Extension%20Cookbook.md).
+and [Adobe CEP 12 cookbook](https://github.com/Adobe-CEP/CEP-Resources/blob/master/CEP%2012%20HTML%20Extension%20Cookbook.md).

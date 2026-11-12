@@ -51,7 +51,7 @@ if ! owned "$root"; then
   # plutil cannot insert directly into JSON on every macOS release.
   /usr/bin/plutil -create xml1 "$root/.kcf-install.json"
   /usr/bin/plutil -insert tool -string 'CapForge' "$root/.kcf-install.json"
-  /usr/bin/plutil -insert version -string '0.3.2' "$root/.kcf-install.json"
+  /usr/bin/plutil -insert version -string '0.3.3' "$root/.kcf-install.json"
   /usr/bin/plutil -insert runtimeRoot -string "$root" "$root/.kcf-install.json"
   /usr/bin/plutil -convert json "$root/.kcf-install.json"
 fi
@@ -92,7 +92,11 @@ echo 'Preparing the private CapForge runtime…'
 "$uv" python install "$python_version" --no-bin --no-registry --managed-python --no-config
 python_path=$("$uv" python find "$python_version" --managed-python --no-config)
 case "$python_path" in "$root/"*) ;; *) echo 'Runtime location could not be verified.'; exit 1 ;; esac
-"$python_path" -I -c 'import tkinter, venv, ssl; tkinter.Tcl().eval("info patchlevel")'
+if [ "$headless" = true ]; then
+  "$python_path" -I -c 'import venv, ssl'
+else
+  "$python_path" -I -c 'import tkinter, venv, ssl; tkinter.Tcl().eval("info patchlevel")'
+fi
 echo 'Opening CapForge Setup…'
 # macOS Bash 3 treats an empty array as unset when nounset is enabled.
 if [ "${#installer_args[@]}" -gt 0 ]; then

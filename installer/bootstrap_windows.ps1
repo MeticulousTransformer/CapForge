@@ -1,15 +1,30 @@
-param([switch]$Headless, [switch]$BootstrapOnly, [string]$RuntimeRoot)
+param(
+    [switch]$Headless,
+    [switch]$BootstrapOnly,
+    [string]$RuntimeRoot,
+    [string]$ExtensionRoot,
+    [switch]$EnableUnsigned
+)
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'runtime_windows.ps1')
 $manifest = Join-Path $PSScriptRoot 'runtime_assets.json'
 if (-not $RuntimeRoot) { $RuntimeRoot = Get-CapForgeRoot }
+foreach ($destination in @($RuntimeRoot, $ExtensionRoot)) {
+    if ($destination -and $destination -notmatch '^(?:[A-Za-z]:[\\/]|\\\\[^\\]+\\[^\\]+)') {
+        throw 'Setup paths must be absolute drive or network folder paths.'
+    }
+}
+$installArguments = @((Join-Path $PSScriptRoot 'install.py'), '--target', $RuntimeRoot)
+if ($ExtensionRoot) { $installArguments += @('--extension-root', $ExtensionRoot) }
+if ($EnableUnsigned) { $installArguments += '--enable-unsigned' }
 
 if ($Headless) {
     try {
         $python = Initialize-CapForgeRuntime $RuntimeRoot $manifest { param($message) Write-Host $message }
         if ($BootstrapOnly) { Write-Output $python; exit 0 }
-        & $python (Join-Path $PSScriptRoot 'install.py') --headless --target $RuntimeRoot
-        exit $LASTEXITCODE
+        $arguments = ($installArguments + '--headless') | ForEach-Object { ConvertTo-CapForgeArgument $_ }
+        $setup = Start-Process -FilePath $python -ArgumentList ($arguments -join ' ') -NoNewWindow -Wait -PassThru
+        exit $setup.ExitCode
     } catch { Write-Error $_; exit 1 }
 }
 
@@ -55,9 +70,10 @@ if ($state.error) {
 }
 $pythonw = Join-Path ([IO.Path]::GetDirectoryName($state.python)) 'pythonw.exe'
 if (-not (Test-Path -LiteralPath $pythonw)) { $pythonw = $state.python }
-$arguments = @((Join-Path $PSScriptRoot 'install.py'),'--target',$RuntimeRoot) | ForEach-Object { ConvertTo-CapForgeArgument $_ }
+$arguments = $installArguments | ForEach-Object { ConvertTo-CapForgeArgument $_ }
 $setup = Start-Process -FilePath $pythonw -ArgumentList ($arguments -join ' ') -WindowStyle Normal -Wait -PassThru
 if ($setup.ExitCode -ne 0) {
     [void][Windows.MessageBox]::Show('The setup window could not open. Run CapForge Setup again to repair it.', 'CapForge Setup')
-    exit 1
+    exit $setup.ExitCode
 }
+exit $setup.ExitCode

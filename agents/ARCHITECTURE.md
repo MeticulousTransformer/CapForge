@@ -38,14 +38,20 @@ installer/environment.py        prerequisite checks + platform paths
 installer/theme.py              installer colors and fixed window dimensions
 installer/runtime_assets.json   pinned uv archives and SHA-256 checksums
 installer/runtime_windows.ps1   private runtime download and path validation
-installer/bootstrap_windows.ps1 native loading UI before Python exists
-installer/bootstrap_macos.sh    private runtime bootstrap using macOS tools
+installer/Launcher.cs           standalone Windows EXE; verified embedded payload
+installer/macos/CapForge.swift  native Mac setup, repair, logs and AE launch
+installer/bootstrap_windows.ps1 Windows loading UI + private runtime bootstrap
+installer/bootstrap_macos.sh    private runtime bootstrap; headless deployment for app
 installer/deployment.py         owned installation, backups, rollback
 installer/service_control.py    authenticated idle service shutdown before updates
-installer/install.py            native wizard + command-line entry
-scripts/package_release.py      explicit release file allowlist
+installer/install.py            Python deployment entry + legacy wizard/native handoff
+scripts/package_release.py      explicit shared source payload allowlist
+scripts/build_macos.py          universal app bundle + public DMG
+scripts/build_windows.py        standalone public Windows EXE
+scripts/package_update.py       OS-specific verified update ZIPs + migration ZIP
 scripts/check_release.py        complete tests, version and archive checks
-.github/workflows/release.yml   tested kml pushes become in-app updates
+scripts/check_native_install.py packaged install/repair checks in fresh destinations
+.github/workflows/release.yml   same-commit Mac/Windows builds + three-platform release gate
 ```
 
 The modern panel uses **CEP**, because ScriptUI cannot host a modern animated
@@ -71,6 +77,9 @@ Data flow:
 
 Installed location:
 
+- Public v0.3.3 downloads: Mac DMG containing `CapForge.app`, and a standalone
+  Windows EXE. Editors do not extract update ZIPs. On Mac the app is copied to
+  Applications; its per-user runtime is a separate folder.
 - Windows runtime: `%LOCALAPPDATA%/CapForge`.
 - macOS runtime: `~/Library/Application Support/CapForge`.
 - An owned earlier `Kartuli Caption Forge` runtime stays in its original path.
@@ -85,6 +94,25 @@ Installed location:
 - Older code/panel copies are backed up under the runtime's `backups/` folder.
 - The preview package is unsigned; the optional debug-mode setting applies to
   all unsigned Adobe extensions for that user. Sign the production package.
+
+Update flow:
+
+1. `backend/services/updates.py` selects the current OS's release ZIP and checks
+   its checksum, file manifest, release identity, platform and native executable.
+2. It opens the native Mac executable or Windows EXE with the existing `--target`
+   and `--extension-root`. The native setup can repair a missing private runtime.
+3. The native setup bootstraps Python and calls headless deployment on Mac. The
+   Windows guided setup retains its Python wizard after the native loader.
+   Ownership, service handoff, backups and rollback remain in the shared modules.
+4. A compatibility ZIP lets the v0.3.2 updater migrate. Its Python GUI entry routes
+   to the bundled native app on Mac; Windows keeps the earlier wizard for that
+   transition. New updaters use shared ZIP fallback only for releases before v0.3.3.
+
+The workflow publishes the Mac and Windows downloads from one SHA/version only
+after packaged installs pass on Windows, Apple Silicon and Intel Mac. Local
+checks do not establish that a release has been published. The Mac app is ad-hoc
+signed but not notarized; the Windows preview has no publisher certificate.
+Neither distribution should be described as free of OS trust prompts.
 
 Security boundaries:
 

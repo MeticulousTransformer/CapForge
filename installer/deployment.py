@@ -15,7 +15,7 @@ from service_control import stop_for_update
 
 TOOL = "CapForge"
 LEGACY_TOOL = "Kartuli Caption Forge"
-VERSION = "0.3.2"
+VERSION = "0.3.3"
 EXTENSION_ID = "com.kartuli.captionforge"
 SOURCE = Path(__file__).resolve().parents[1]
 RUNTIME_FILES = ("run_backend.bat", "run_backend.sh", "Install Windows.cmd", "Install macOS.command", "LICENSE", "README.md")

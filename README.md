@@ -1,6 +1,6 @@
 # CapForge
 
-## Studio v0.3.2
+## Studio v0.3.3
 
 A new dockable **CEP panel** wraps the existing caption engine in a focused
 studio interface. It has a built-in animated caption screen, thirteen searchable
@@ -14,27 +14,33 @@ and styles, flexible wrapping, boundary fitting, full shadows/outlines/boxes and
 seeded word-style shuffle. Controls are grouped into Motion, Typography, Layout,
 Finish and Style shuffle. Saved looks include every setting.
 
-**Start here:** double-click `CapForge Setup.exe` on Windows (`Install Windows.cmd`
-if the EXE is absent) or `Install macOS.command` on Mac
-from the extracted package. The guided installer checks prerequisites, installs
-for your user and preserves existing keys/exports when updating. The launcher
-automatically prepares a private runtime; the wizard installs audio preparation
-and transcription support. **No separate Python installation, PATH edits or
-package manager required.** Internet is needed for first setup.
+## Download for your computer
 
-Open **Window → Extensions → CapForge** after restarting AE.
-Explore the demo, or open **Setup** to start the local service and add a provider
-key. CapForge checks the connection automatically after you start the service. Select an AE composition before generating captions.
+| Mac | Windows |
+| --- | --- |
+| **[Download the macOS DMG](https://github.com/MeticulousTransformer/Georgian-Kartuli-After-Effects-Transcribtion-Tool/releases/latest)** | **[Download the Windows Setup EXE](https://github.com/MeticulousTransformer/Georgian-Kartuli-After-Effects-Transcribtion-Tool/releases/latest)** |
+| Open the DMG → drag CapForge to Applications → open CapForge. | Open `CapForge-0.3.3-Windows.exe` and follow Setup. No ZIP extraction. |
+| [Mac installation guide](docs/INSTALL_MAC.md) | [Windows installation guide](docs/INSTALL_WINDOWS.md) |
 
-v0.3.2 fixes the `KCF_PRESET_LABELS is undefined` error, Finder launch permissions,
-fresh Mac setup, inherited All Caps formatting, and media paths containing
-Georgian or special characters. Setup installs a private Python runtime and the
-same pinned dependencies on each device, including bundled audio tools.
+**[CapForge download website](https://meticuloustransformer.github.io/Georgian-Kartuli-After-Effects-Transcribtion-Tool/)**
 
-**Updates:** open **Setup → Check for updates → Update**. CapForge downloads and
-verifies the official release, then opens Setup. Save your project and close AE
-before clicking Install; reopen AE after setup. Saved keys, exports and looks
-are preserved. See [updates and publishing](docs/UPDATES.md).
+Both native installers use the same **0.3.3** code and release commit. Mac
+supports Apple Silicon and Intel. First setup needs internet and prepares a
+private Python runtime and audio support. No PATH edits or package manager.
+
+Save your project and close AE during setup. Then open
+**Window → Extensions → CapForge** (or **Extensions (Legacy)**). Try the demo,
+or connect one transcription provider in Setup and choose a short clip.
+
+This preview is not Apple notarized or Windows code-signed. OS trust warnings
+can appear; read your platform guide. Adobe's unsigned-extension option is
+separate and explicitly shown in Setup.
+
+**Updates:** open **Setup → Check for updates → Update**. CapForge chooses and
+verifies the package for your OS and opens native Setup. Save and close AE before
+installing, then reopen it. Keys and exports survive updates. The additional ZIP
+assets on GitHub support automatic updates and migration from 0.3.2; new users
+should choose the DMG or EXE. See [updates](docs/UPDATES.md).
 
 The service accepts both local origins used by Adobe CEP (`file://` and `null`),
 so the installed panel can connect without the erroneous “This service only
@@ -52,7 +58,7 @@ require the installation token; web origins remain blocked.
 - [Fresh review: bugs, causes and programming lessons](docs/BUGS_AND_LESSONS.md)
 - [Current review evidence and remaining acceptance work](docs/REVIEW_2026-11-12.md)
 
-**Release status:** this package is unsigned. The installer offers Adobe's
+**Release status:** this package is unsigned. Setup offers Adobe's
 per-user unsigned-extension mode. Local validation covers Apple Silicon Mac
 installation and AE 26.5 generation; the automated release workflow also requires
 Windows and Intel Mac installation checks. Signing and broader AE-version

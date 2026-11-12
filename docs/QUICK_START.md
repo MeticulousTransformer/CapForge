@@ -1,12 +1,16 @@
 # Your first captions
 
-1. Extract the entire CapForge package. Connect to the internet for first setup.
-2. Close AE. Double-click **CapForge Setup.exe** (Windows; **Install Windows.cmd**
-   is the fallback) or **Install macOS.command** (Mac).
-   The launcher prepares CapForge's private runtime automatically. Click
-   **Install CapForge** in the wizard; audio and transcription support are
-   installed for you. No Python download or PATH setup is needed. This preview build needs
-   Adobe's unsigned-extension mode; the wizard has an explicit checkbox.
+1. Download your platform's installer from the
+   [CapForge download page](https://meticuloustransformer.github.io/Georgian-Kartuli-After-Effects-Transcribtion-Tool/)
+   or [official release](https://github.com/MeticulousTransformer/Georgian-Kartuli-After-Effects-Transcribtion-Tool/releases/latest).
+   On Mac, open **CapForge-0.3.3-macOS.dmg**, drag **CapForge.app** to Applications,
+   and open it there. On Windows, open **CapForge-0.3.3-Windows.exe** directly.
+   See the [Mac guide](INSTALL_MAC.md) or [Windows guide](INSTALL_WINDOWS.md).
+2. Close AE and click **Install CapForge**. Keep internet available while Setup
+   prepares the private runtime, audio support, and caption panel. No Python
+   download or PATH setup is needed. For this preview, enable the explicit
+   **Allow unsigned Adobe extensions for this account** option. It applies to
+   all unsigned Adobe panels for your account.
 3. Restart AE. Open **Window → Extensions → CapForge** (Adobe may
    label this menu **Extensions (Legacy)**).
 4. Play the built-in preview and choose a style. Open **Design** to change the
@@ -29,14 +33,16 @@ Save look exports reusable visual settings. Keep your AE project saved as usual.
 Generated keyframes remain editable even without the panel.
 
 **Updates:** In Setup, choose **Check for updates**, then **Update** when offered.
-CapForge downloads and checks the package and opens Setup for you. Save your AE
-project, close AE, and click Install. Reopen AE afterward. Setup closes the old
+CapForge downloads and checks the package for your OS and opens Setup for you.
+Save your AE project, close AE, and click **Update / Repair** on Mac or
+**Install CapForge** on Windows. Reopen AE afterward. Setup closes the old
 local service automatically and preserves your keys and exports. An older
 service from before v0.3.2 may need its window closed once before updating.
 
-**Mac access-privileges error:** use the ZIP attached to the latest release and
-extract the entire package. The v0.3.2 launcher includes the correct permissions;
-the old download needs replacing. Avoid sharing the installer file by itself.
+**App security prompts:** This preview has no trusted publisher certificate and
+is not Apple notarized. A native installer does not remove OS security warnings.
+Use the platform guide above for the official per-app opening instructions.
+No certificate installation or global security changes are needed.
 
 **Source alignment:** Transcription starts at the source file's beginning.
 Selecting a trimmed or offset footage layer does not change that. Move the

@@ -47,6 +47,15 @@ function KCF_hostRead(file) {
     if (!file.open("r")) { throw new Error("Could not read the file."); }
     try { return file.read(); } finally { file.close(); }
 }
+function KCF_shellQuote(value) {
+    return "'" + String(value).replace(/'/g, "'\\''") + "'";
+}
+function KCF_macServiceCommand(root) {
+    var python = root + "/.venv/bin/python";
+    var script = root + "/backend/start_service.py";
+    return "/usr/bin/nohup " + KCF_shellQuote(python) + " " + KCF_shellQuote(script) +
+        " > " + KCF_shellQuote(root + "/service.log") + " 2>&1 < /dev/null &";
+}
 function KCF_hostComp() {
     var comp = app.project && app.project.activeItem;
     if (!(comp && comp instanceof CompItem)) { return null; }
@@ -118,6 +127,14 @@ function KCF_dispatch(json) {
             break;
         case "startService":
             var isWindows = $.os.indexOf("Windows") === 0;
+            if (!isWindows) {
+                var servicePython = new File(KCF_runtimeRoot.fsName + "/.venv/bin/python");
+                var serviceScript = new File(KCF_runtimeRoot.fsName + "/backend/start_service.py");
+                if (!servicePython.exists || !serviceScript.exists) { throw new Error("Audio service needs setup. Open CapForge from Applications and click Install CapForge or Update or repair."); }
+                // Background process with redirected output: no Terminal window.
+                system.callSystem("/bin/sh -c " + KCF_shellQuote(KCF_macServiceCommand(KCF_runtimeRoot.fsName)));
+                data = true; break;
+            }
             var launcher = new File(KCF_runtimeRoot.fsName + (isWindows ? "/run_backend.bat" : "/run_backend.command"));
             if (!launcher.exists || !launcher.execute()) { throw new Error("Could not launch the service. Run the Start service shortcut from your installation folder."); }
             data = true; break;
