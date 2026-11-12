@@ -212,7 +212,9 @@ class TestUpdates(unittest.TestCase):
         self.base_python.unlink()
         with patch.object(updates.subprocess, "Popen", return_value=SimpleNamespace(poll=lambda: None)) as launch:
             self.assertTrue(updates.install(self.root, "0.3.2")["started"])
-        self.assertTrue(launch.call_args.args[0][0].endswith(updates.NATIVE_SETUP["macos"]))
+        executable = Path(launch.call_args.args[0][0])
+        package_root = Path(launch.call_args.kwargs["cwd"])
+        self.assertEqual(executable.relative_to(package_root).as_posix(), updates.NATIVE_SETUP["macos"])
 
     def test_native_setup_launch_keeps_installed_keys_and_exports_untouched(self):
         for name in ("backend/.env", "backend/.local-token", "exports/normalized.json"):
@@ -278,7 +280,7 @@ class TestUpdates(unittest.TestCase):
             self.assertTrue(updates.install(self.root, "0.3.2")["started"])
         command = launch.call_args.args[0]
         self.assertEqual(command[0], str(self.base_python))
-        self.assertTrue(command[1].endswith("installer/install.py"))
+        self.assertEqual(Path(command[1]), Path(launch.call_args.kwargs["cwd"]) / "installer/install.py")
         self.assertEqual(command[2:], ["--target", str(self.root), "--extension-root", str(self.extension.parent)])
 
     def test_legacy_wizard_never_uses_a_missing_or_external_python(self):

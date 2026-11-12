@@ -341,6 +341,15 @@ created, so using that path is appropriate. The installer's checks for arbitrary
 user-supplied links remain in place. A failing test can reveal a mistake in its
 setup as well as in the application.
 
+The first Windows run then caught two tests comparing paths as plain text.
+They expected `installer/install.py`, but Windows correctly returned
+`installer\\install.py`. The command was valid; the assertion assumed Mac's
+separator. Compare path components with `Path(...).parts`, or normalize a path
+with `Path(...).as_posix()` before comparing it with a slash-based fixture.
+Likewise, Unix executable permission bits belong in Unix tests; Windows uses a
+different permission model. Keep the behavior checks on both systems, and test
+OS-specific details on the system that implements them.
+
 Finally, a working installer and a trusted publisher are separate requirements.
 Executable permissions allow a file to run. Signing with a trusted publisher
 certificate identifies its publisher; Apple notarization adds Apple's checking

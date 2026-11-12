@@ -45,8 +45,13 @@ class MacSourceTests(unittest.TestCase):
     def test_verified_payload_extracts_with_launch_permissions(self):
         identity = package.unpack_source(self.archive(), self.root / "payload")
         self.assertEqual(identity["version"], "0.3.3")
-        self.assertTrue((self.root / "payload/installer/bootstrap_macos.sh").stat().st_mode & 0o111)
-        self.assertFalse((self.root / "payload/installer/install.py").stat().st_mode & 0o111)
+        script = self.root / "payload/installer/bootstrap_macos.sh"
+        installer = self.root / "payload/installer/install.py"
+        self.assertEqual(script.read_bytes(), b"fixture")
+        self.assertEqual(installer.read_bytes(), b"fixture")
+        if os.name != "nt":
+            self.assertTrue(script.stat().st_mode & 0o111)
+            self.assertFalse(installer.stat().st_mode & 0o111)
 
     def test_rejects_tampered_payload(self):
         with self.assertRaisesRegex(ValueError, "verification failed"):
