@@ -1,6 +1,6 @@
 # v0.3.2 validation — 12 November 2026
 
-- **238 automated tests passed:** 82 backend, 28 installer, 11 release/package,
+- **241 automated tests passed:** 82 backend, 31 installer, 11 release/package,
   and 117 AE/panel tests. The full release checker also passed version parity,
   shell syntax and archive generation. Tests exercised real loopback shutdown.
 - Reproduced the reported `KCF_PRESET_LABELS is undefined` inside AE 26.5 on
@@ -34,6 +34,10 @@
 - Windows Unicode repair was reproduced with a real child Python process using
   cp1252 output and a Georgian interpreter path. ASCII-safe JSON now preserves
   that path instead of incorrectly rebuilding a healthy service environment.
+- The first hosted run passed Intel Mac checks and a fresh private install.
+  Windows exposed delayed connection refusal on closed localhost ports; the
+  installer now allows that response within a bounded shutdown wait. A timeout
+  still blocks replacement. Three additional lifecycle regressions passed.
 - UI update flow checked in Chrome with a simulated AE host/release response:
   Check for updates → Update → Setup handoff message. Narrow 440-pixel viewport
   had no horizontal overflow; no console errors. This does not establish a
@@ -43,10 +47,11 @@
   identity. Installer tests cover fresh `plutil` records, failed/broken runtimes,
   external-Python migration, rollback, busy services and unrelated services.
 
-Still external to this local validation: running the new GitHub workflow on
-Windows/Intel Mac, signed/notarized distribution, paid-provider transcription,
-and actual playback on other AE versions. The workflow is prepared locally;
-no release has been published by this work. The Mac-built ZIP includes the
+Still external to this local validation: complete hosted Windows/Intel Mac
+release checks, signed/notarized distribution, paid-provider transcription,
+and actual playback on other AE versions. Follow the
+[release workflow](https://github.com/MeticulousTransformer/Georgian-Kartuli-After-Effects-Transcribtion-Tool/actions/workflows/release.yml)
+for hosted validation and publication results. The Mac-built ZIP includes the
 Windows CMD fallback; GitHub's Windows packaging job adds the native EXE.
 
 ## Historical v0.3.1 validation

@@ -10,6 +10,8 @@ import urllib.error
 import urllib.request
 
 STOP_TIMEOUT = 10.0
+# Windows can take several seconds to report a refused localhost connection.
+CONNECT_TIMEOUT = 5.0
 
 
 class NoRedirects(urllib.request.HTTPRedirectHandler):
@@ -34,7 +36,7 @@ def stop_for_update(root: Path, *, progress=print) -> bool:
             f"http://127.0.0.1:{port}{path}", method=method,
             headers={"X-KCF-Token": token},
         )
-        with opener.open(message, timeout=2) as response:
+        with opener.open(message, timeout=CONNECT_TIMEOUT) as response:
             body = response.read(16385)
         if len(body) > 16384:
             raise ValueError("Unexpected service response")
@@ -72,13 +74,18 @@ def stop_for_update(root: Path, *, progress=print) -> bool:
 
     # Wait for the listener to close; never terminate a process by PID or name.
     deadline = time.monotonic() + STOP_TIMEOUT
-    while time.monotonic() < deadline:
+    while True:
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            break
         try:
-            with socket.create_connection(("127.0.0.1", port), timeout=0.5):
+            with socket.create_connection(("127.0.0.1", port), timeout=min(CONNECT_TIMEOUT, remaining)):
                 pass
         except ConnectionRefusedError:
             return True
         except OSError:
             pass
-        time.sleep(0.1)
+        remaining = deadline - time.monotonic()
+        if remaining > 0:
+            time.sleep(min(0.1, remaining))
     raise RuntimeError("The CapForge service did not stop in time. Close its window, then try installation again.")

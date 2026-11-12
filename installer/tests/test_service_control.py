@@ -1,5 +1,6 @@
 """A local test server exercises authenticated, non-destructive update shutdown."""
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+import io
 import json
 import os
 from pathlib import Path
@@ -7,6 +8,7 @@ import sys
 import tempfile
 import threading
 import unittest
+import urllib.error
 from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -87,6 +89,43 @@ class ServiceControlTests(unittest.TestCase):
     def test_no_listener_requires_no_shutdown(self):
         self.close_server()
         self.assertFalse(service_control.stop_for_update(self.root))
+
+    def test_slow_connection_refusal_requires_no_shutdown(self):
+        def open_request(request, *, timeout):
+            reason = ConnectionRefusedError() if timeout >= 2.5 else TimeoutError()
+            raise urllib.error.URLError(reason)
+        with patch("service_control.urllib.request.build_opener") as build_opener:
+            build_opener.return_value.open.side_effect = open_request
+            self.assertFalse(service_control.stop_for_update(self.root))
+
+    def test_unresponsive_service_is_never_assumed_closed(self):
+        with patch("service_control.urllib.request.build_opener") as build_opener:
+            build_opener.return_value.open.side_effect = urllib.error.URLError(TimeoutError())
+            with self.assertRaisesRegex(RuntimeError, "not responding"):
+                service_control.stop_for_update(self.root)
+
+    def test_shutdown_wait_allows_slow_refusal_and_bounds_timeouts(self):
+        for refuses in (True, False):
+            with self.subTest(refuses=refuses):
+                elapsed = [0.0]
+                def connect(address, *, timeout):
+                    elapsed[0] += min(timeout, 2.5) if refuses else timeout
+                    if refuses and timeout >= 2.5:
+                        raise ConnectionRefusedError()
+                    raise TimeoutError()
+                def sleep(seconds):
+                    elapsed[0] += seconds
+                with patch("service_control.urllib.request.build_opener") as build_opener, patch("service_control.socket.create_connection", side_effect=connect), patch("service_control.time.monotonic", side_effect=lambda: elapsed[0]), patch("service_control.time.sleep", side_effect=sleep):
+                    build_opener.return_value.open.side_effect = [
+                        io.BytesIO(json.dumps({"runtimeRoot": str(self.root)}).encode()),
+                        io.BytesIO(b'{"stopping": true}'),
+                    ]
+                    if refuses:
+                        self.assertTrue(service_control.stop_for_update(self.root, progress=lambda _: None))
+                    else:
+                        with self.assertRaisesRegex(RuntimeError, "did not stop"):
+                            service_control.stop_for_update(self.root, progress=lambda _: None)
+                    self.assertLessEqual(elapsed[0], service_control.STOP_TIMEOUT)
 
     def test_another_installation_is_never_stopped(self):
         self.mode = "other"
