@@ -96,12 +96,26 @@ function makeLayer(index, options, text) {
        one persistent object records the whole TextDocument. */
     const sourceText = {
         value: {
+            text: String(text || ""),
             font: "", fontSize: 0, tracking: 0,
             autoLeading: true, leading: 0,
             applyFill: true, fillColor: [1, 1, 1],
             applyStroke: false, strokeColor: [0, 0, 0], strokeWidth: 0,
             strokeOverFill: false, justification: null,
-            fauxBold: false, fauxItalic: false
+            fauxBold: false, fauxItalic: false,
+            allCaps: false, smallCaps: false,
+            horizontalScale: 100, verticalScale: 100, baselineShift: 0,
+            resetCharStyle() {
+                Object.assign(this, {
+                    font: "", fontSize: 12, tracking: 0,
+                    autoLeading: true, leading: 0,
+                    applyFill: true, fillColor: [1, 1, 1],
+                    applyStroke: false, strokeColor: [0, 0, 0], strokeWidth: 0,
+                    strokeOverFill: false, fauxBold: false, fauxItalic: false,
+                    allCaps: false, smallCaps: false,
+                    horizontalScale: 100, verticalScale: 100, baselineShift: 0
+                });
+            }
         },
         applied: null,
         setValue(doc) { sourceText.applied = doc; }

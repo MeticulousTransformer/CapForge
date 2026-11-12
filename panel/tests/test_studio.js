@@ -130,14 +130,15 @@ test("preview wraps with the same orphan-word behavior as the AE engine", () => 
 });
 
 test("host rejects malformed payloads before invoking non-destructive generation", () => {
-    const context = {File: function () { this.parent = {parent: {}}; }, $: {fileName:"host.jsx", evalFile() { throw Error("test bootstrap"); }}, JSON, KCF_PRESETS: {minimal: ()=>{}}};
+    const context = {File: function () { this.parent = {parent: {}}; }, $: {fileName:"host.jsx", evalFile() { throw Error("test bootstrap"); }}, JSON};
     vm.createContext(context); vm.runInContext(fs.readFileSync(path.join(root,"panel/host.jsx"),"utf8"),context);
     context.KCF_hostError = null;
+    context.KCF_engine = {presets: {minimal: ()=>{}}};
     context.KCF_hostValidate(sample(), {preset:"minimal",fontSize:72});
     const bad = sample(); bad.words[0].end = -1;
     assert.throws(() => context.KCF_hostValidate(bad, {preset:"minimal",fontSize:72}));
     assert.throws(() => context.KCF_hostValidate(sample(), {preset:"unknown",fontSize:72}));
-    let called = 0; context.KCF_generate = () => {called++; return "new-precomp";};
+    let called = 0; context.KCF_engine.generate = () => {called++; return "new-precomp";};
     const result = JSON.parse(context.KCF_dispatch(JSON.stringify({action:"generate",payload:{document:sample(),settings:{preset:"minimal",fontSize:72}}})));
     assert.equal(result.ok,true); assert.equal(called,1);
     assert.equal(JSON.parse(context.KCF_dispatch(JSON.stringify({action:"removeAll"}))).ok,false);

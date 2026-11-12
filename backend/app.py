@@ -14,7 +14,7 @@ from threading import Lock
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-VERSION = "0.3.1"
+VERSION = "0.3.2"
 BACKEND_DIR = os.path.dirname(os.path.abspath(__file__))
 EXPORTS_DIR = os.path.join(os.path.dirname(BACKEND_DIR), "exports")
 
@@ -38,7 +38,7 @@ def load_env() -> None:
 
 load_env()
 
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import BackgroundTasks, FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.exceptions import RequestValidationError
 from starlette.middleware.trustedhost import TrustedHostMiddleware
@@ -52,6 +52,7 @@ from services.models import Word, build_document
 from services.studio_settings import local_token, save_provider_key
 from services.transcript_validation import validate_document
 from services.provider_registry import available_ids, get_provider, list_infos
+from services import updates
 from providers.base import ProviderError
 
 PANEL_ORIGINS = ["null", "file://"]
@@ -84,6 +85,8 @@ async def protect_local_service(request: Request, call_next):
     if request.method != "OPTIONS" and request.url.path != "/health":
         if not secrets.compare_digest(request.headers.get("x-kcf-token", ""), local_token(BACKEND_DIR)):
             return JSONResponse(status_code=401, content={"detail": "Panel authorization missing. Start the installed service and check the connection in Setup."})
+    if _service_stopping and request.method != "OPTIONS" and request.url.path not in {"/health", "/service/info", "/service/stop"}:
+        return JSONResponse(status_code=503, content={"detail": "CapForge is stopping for an update. Start the service again after setup finishes."})
     return await call_next(request)
 
 
@@ -127,6 +130,8 @@ class ProviderKeyRequest(BaseModel):
 
 
 _transcription_lock = Lock()
+_shutdown_server = None
+_service_stopping = False
 
 
 def _run_exports() -> str:
@@ -153,6 +158,47 @@ def health():
 @app.get("/providers")
 def providers():
     return {"providers": list_infos(), "local": scan_local()}
+
+
+@app.get("/service/info")
+def service_info():
+    return {"runtimeRoot": os.path.realpath(os.path.dirname(BACKEND_DIR)), "version": VERSION}
+
+
+@app.post("/service/stop")
+def stop_service(background: BackgroundTasks):
+    global _service_stopping
+    if not _transcription_lock.acquire(blocking=False):
+        raise HTTPException(status_code=409, detail="Wait for the current transcription to finish before updating CapForge.")
+    try:
+        if _shutdown_server is None:
+            raise HTTPException(status_code=409, detail="Close the existing CapForge service window before updating. This service cannot stop itself.")
+        if not _service_stopping:
+            _service_stopping = True
+            background.add_task(_shutdown_server)
+        return {"stopping": True, "message": "CapForge is stopping so the installer can safely update it."}
+    finally:
+        _transcription_lock.release()
+
+
+@app.get("/updates/check")
+def check_updates():
+    try:
+        return updates.check(os.path.dirname(BACKEND_DIR), VERSION)
+    except updates.UpdateError as error:
+        raise HTTPException(status_code=error.status_code, detail=str(error))
+
+
+@app.post("/updates/install")
+def install_update():
+    if not _transcription_lock.acquire(blocking=False):
+        raise HTTPException(status_code=409, detail="Wait for the current transcription to finish before updating CapForge.")
+    try:
+        return updates.install(os.path.dirname(BACKEND_DIR), VERSION)
+    except updates.UpdateError as error:
+        raise HTTPException(status_code=error.status_code, detail=str(error))
+    finally:
+        _transcription_lock.release()
 
 
 @app.post("/extract_audio")
@@ -267,4 +313,8 @@ if __name__ == "__main__":
     port = int(os.environ.get("KCF_PORT", "8765"))
     local_token(BACKEND_DIR)
     print(f"CapForge backend v{VERSION} -> http://127.0.0.1:{port}")
-    uvicorn.run(app, host="127.0.0.1", port=port)
+    server = uvicorn.Server(uvicorn.Config(app, host="127.0.0.1", port=port))
+    def request_shutdown():
+        server.should_exit = True
+    _shutdown_server = request_shutdown
+    server.run()

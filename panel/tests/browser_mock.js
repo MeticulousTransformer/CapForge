@@ -19,10 +19,12 @@ window.fetch = function (url, options) {
     var payload = options.body ? JSON.parse(options.body) : null;
     window.KCF_QA.apiCalls.push({path:path,payload:payload});
     var data = {};
-    if (path === "/health") { data = {ok:true,version:"qa",ffmpeg:true}; }
+    if (path === "/health") { data = {ok:true,version:"0.3.2",ffmpeg:true}; }
     if (path === "/providers") { data = {providers:[{id:"elevenlabs",label:"ElevenLabs Scribe v2",type:"cloud",available:true}]}; }
     if (path === "/transcribe") { data = {document:window.KCF_Transcript.demo("ka-GE"),timingQuality:"word",warnings:[]}; data.document.provider = "qa"; }
     if (path === "/regroup") { data = {document:payload.document}; }
     if (path === "/extract_audio") { data = {audio:"/qa/exports/audio.wav",duration:8}; }
+    if (path === "/updates/check") { data = {available:true,version:"0.3.3",tag:"qa-build",notes:"A sample update for visual testing.",message:"An update is ready to install."}; }
+    if (path === "/updates/install") { data = {started:true,message:"Setup is opening. Save your project and close After Effects before installing."}; }
     return Promise.resolve({ok:true,json:function () { return Promise.resolve(data); }});
 };

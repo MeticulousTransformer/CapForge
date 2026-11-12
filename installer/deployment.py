@@ -11,10 +11,11 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from environment import data_root, extension_root
+from service_control import stop_for_update
 
 TOOL = "CapForge"
 LEGACY_TOOL = "Kartuli Caption Forge"
-VERSION = "0.3.1"
+VERSION = "0.3.2"
 EXTENSION_ID = "com.kartuli.captionforge"
 SOURCE = Path(__file__).resolve().parents[1]
 RUNTIME_FILES = ("run_backend.bat", "run_backend.sh", "Install Windows.cmd", "Install macOS.command", "LICENSE", "README.md")
@@ -37,6 +38,15 @@ def _owned(root: Path, marker: str) -> bool:
         return json.loads(file.read_text(encoding="utf-8-sig")).get("tool") in {TOOL, LEGACY_TOOL}
     except (ValueError, OSError):
         return False
+
+
+def _uses_private_python(python: Path, runtime: Path) -> bool:
+    if not python.is_absolute() or runtime.is_symlink() or not runtime.is_dir():
+        return False
+    executable = python.resolve()
+    # samefile also recognizes differently capitalized paths on macOS. Resolve
+    # the executable first so a link to an outside interpreter stays outside.
+    return executable.is_file() and any(parent.samefile(runtime) for parent in executable.parents)
 
 
 def enable_unsigned() -> None:
@@ -68,6 +78,9 @@ def install(target: Path | None = None, extensions: Path | None = None, *, depen
     extension = _inside(ext_parent / EXTENSION_ID, ext_parent)
     if extension.is_symlink() or (extension.exists() and not _owned(extension, "install.json")):
         raise ValueError("The extension destination is not owned by CapForge. Move it aside before installing.")
+    if (root / ".runtime").is_symlink():
+        raise ValueError("The private runtime is a symbolic link. Choose an installation folder without symbolic links.")
+    stop_for_update(root, progress=progress)
     root.mkdir(parents=True, exist_ok=True)
     ext_parent.mkdir(parents=True, exist_ok=True)
     marker = {"tool": TOOL, "version": VERSION, "runtimeRoot": str(root), "extension": str(extension)}
@@ -91,25 +104,39 @@ def install(target: Path | None = None, extensions: Path | None = None, *, depen
         shutil.copytree(SOURCE / "panel", staging / "panel", ignore=shutil.ignore_patterns("install.json", "json2.js"))
         shutil.copy2(SOURCE / "ae/lib/json2.js", staging / "panel/json2.js")
         (staging / "panel/install.json").write_text(json.dumps(marker, indent=2), encoding="utf-8")
-        runtime_files = RUNTIME_FILES + (("CapForge Setup.exe",) if (SOURCE / "CapForge Setup.exe").is_file() else ())
+        runtime_files = RUNTIME_FILES + tuple(name for name in ("CapForge Setup.exe", "release.json") if (SOURCE / name).is_file())
         for name in runtime_files:
             shutil.copy2(SOURCE / name, staging / name)
         shutil.copy2(SOURCE / "run_backend.sh", staging / "run_backend.command")
-        (staging / "run_backend.command").chmod(0o755)
+        # Archives and cross-platform copies can discard POSIX permissions.
+        # Repair launchers must still open from Finder after installation.
+        for name in ("Install macOS.command", "installer/bootstrap_macos.sh", "run_backend.sh", "run_backend.command"):
+            (staging / name).chmod(0o755)
         if dependencies:
             progress("Preparing your private transcription service…")
             environment = _inside(root / ".venv", root)
             if environment.is_symlink():
                 raise ValueError("The service environment is a symbolic link. Refusing to replace it.")
             python = environment / ("Scripts/python.exe" if sys.platform == "win32" else "bin/python")
-            if python.exists():
+            if environment.exists():
                 try:
-                    healthy = subprocess.run([str(python), "-I", "-c", "import sys, pip"], capture_output=True, timeout=20).returncode == 0
-                except (OSError, subprocess.TimeoutExpired):
+                    # JSON keeps this pipe ASCII-safe on Windows even when the
+                    # user's folder contains Georgian or other Unicode text.
+                    health = subprocess.run([str(python), "-I", "-c", "import json, sys, pip; print(json.dumps(sys._base_executable))"], capture_output=True, text=True, timeout=20)
+                    healthy = health.returncode == 0
+                    base_executable = json.loads(health.stdout) if healthy else None
+                    healthy = healthy and isinstance(base_executable, str) and bool(base_executable)
+                    private_runtime = root / ".runtime"
+                    if healthy and _uses_private_python(Path(sys.executable), private_runtime):
+                        # Earlier installs may work with system Python but cannot
+                        # launch the independent private updater until migrated.
+                        base_python = Path(base_executable)
+                        healthy = _uses_private_python(base_python, private_runtime)
+                except (OSError, ValueError, subprocess.TimeoutExpired):
                     healthy = False
                 if not healthy:
-                    # A removed earlier system Python can leave a broken venv.
-                    # Keep it recoverable and build a new one with our runtime.
+                    # Keep the earlier environment recoverable during repair
+                    # or migration to the private runtime.
                     progress("Repairing the transcription service…")
                     backup = _inside(backups / "environment", root)
                     backup.parent.mkdir(parents=True, exist_ok=True)
@@ -119,11 +146,20 @@ def install(target: Path | None = None, extensions: Path | None = None, *, depen
                 subprocess.run([sys.executable, "-m", "venv", str(environment)], check=True, capture_output=True, text=True)
             progress("Installing the transcription service (internet required)…")
             cache = _inside(root / ".runtime/pip-cache", root)
-            result = subprocess.run([str(python), "-m", "pip", "--isolated", "install", "--disable-pip-version-check", "--cache-dir", str(cache), "-r", str(staging / "backend/requirements.txt")], capture_output=True, text=True)
+            requirements = staging / "backend/requirements-lock.txt"
+            if not requirements.is_file():
+                requirements = staging / "backend/requirements.txt"
+            result = subprocess.run([str(python), "-m", "pip", "--isolated", "install", "--disable-pip-version-check", "--cache-dir", str(cache), "-r", str(requirements)], capture_output=True, text=True)
             if result.returncode:
                 raise RuntimeError("Could not install the service packages. Check your internet connection and retry.\n" + (result.stderr or result.stdout)[-900:])
-            progress("Checking audio preparation…")
-            subprocess.run([str(python), "-I", "-c", "import imageio_ffmpeg; imageio_ffmpeg.get_ffmpeg_exe()"], check=True, capture_output=True, text=True)
+            progress("Checking transcription and audio support…")
+            for command in (
+                [str(python), "-m", "pip", "--isolated", "check"],
+                [str(python), "-I", "-c", "import fastapi, uvicorn, pydantic, requests, imageio_ffmpeg; imageio_ffmpeg.get_ffmpeg_exe()"],
+            ):
+                result = subprocess.run(command, capture_output=True, text=True)
+                if result.returncode:
+                    raise RuntimeError("The transcription packages could not be verified. Run setup again.\n" + (result.stderr or result.stdout)[-900:])
         progress("Installing the After Effects panel…")
         for name in ("ae", "backend", "docs", "agents", "installer", "panel", "run_backend.command") + runtime_files:
             destination = _inside(root / name, root)

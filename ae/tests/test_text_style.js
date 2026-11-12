@@ -23,6 +23,28 @@ function style(overrides) {
     return layer.textDocument;
 }
 
+test("generated text ignores inherited AE caps and character scaling", () => {
+    const context = loadLib();
+    const layer = makeTextLayer();
+    Object.assign(layer.textDocument, {
+        allCaps: true, horizontalScale: 160, verticalScale: 70, baselineShift: 25,
+        fauxItalic: true
+    });
+    context.KCF_styleTextLayer(layer, Object.assign({}, BASE, { fauxBold: true }));
+    const applied = layer.sourceText.applied;
+
+    assert.equal(applied.allCaps, false, "lowercase transcript words must stay lowercase on screen");
+    assert.equal(applied.smallCaps, false);
+    assert.equal(applied.text, "word");
+    assert.equal(applied.horizontalScale, 100);
+    assert.equal(applied.verticalScale, 100);
+    assert.equal(applied.baselineShift, 0);
+    assert.equal(applied.fauxItalic, false);
+    assert.equal(applied.fauxBold, true, "requested styling still applies after the reset");
+    assert.equal(applied.font, "NotoSansGeorgian-Bold");
+    assert.equal(applied.fontSize, 72);
+});
+
 // --- fill and stroke --------------------------------------------------
 
 test("text is filled by default", () => {

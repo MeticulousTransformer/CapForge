@@ -2,9 +2,11 @@
 var KCF_hostRoot = null;
 var KCF_runtimeRoot = null;
 var KCF_hostError = "The caption engine has not been initialized.";
+var KCF_engine = null;
 
 // CEP provides this path explicitly. $.fileName can refer to another AE script.
 function KCF_initialize(extensionPath) {
+    KCF_engine = null;
     try {
         KCF_hostRoot = new Folder(extensionPath);
         KCF_runtimeRoot = KCF_hostRoot.parent;
@@ -27,6 +29,9 @@ function KCF_initialize(extensionPath) {
             $.evalFile(library);
         }
         KCF_loadTitles(new Folder(KCF_runtimeRoot.fsName + "/ae/titles"));
+        // ExtendScript evaluates these files in this function's scope. Keep
+        // the engine and its closure available to later CEP dispatch calls.
+        KCF_engine = { generate: KCF_generate, presets: KCF_PRESETS, labels: KCF_PRESET_LABELS };
         KCF_hostError = null;
         return JSON.stringify({ ok: true, data: true });
     } catch (error) {
@@ -62,7 +67,7 @@ function KCF_hostFonts() {
 }
 function KCF_hostValidate(doc, settings) {
     if (!doc || !doc.words || !doc.captions || !doc.words.length || !doc.captions.length || doc.words.length > 20000) { throw new Error("A valid word-timed transcript is required."); }
-    if (!settings || !KCF_PRESETS[settings.preset] || !(settings.fontSize >= 8 && settings.fontSize <= 600)) { throw new Error("Choose a registered style and a valid font size."); }
+    if (!settings || !KCF_engine.presets[settings.preset] || !(settings.fontSize >= 8 && settings.fontSize <= 600)) { throw new Error("Choose a registered style and a valid font size."); }
     var seen = {}, used = {}, previous = -1;
     for (var i = 0; i < doc.words.length; i++) {
         var w = doc.words[i];
@@ -87,14 +92,14 @@ function KCF_dispatch(json) {
         if (KCF_hostError) { throw new Error(KCF_hostError); }
         var request = JSON.parse(json), data = null, payload = request.payload || {};
         switch (request.action) {
-        case "context": data = { comp: KCF_hostComp(), fonts: KCF_hostFonts(), presets: KCF_PRESET_LABELS }; break;
+        case "context": data = { comp: KCF_hostComp(), fonts: KCF_hostFonts(), presets: KCF_engine.labels }; break;
         case "token":
             var tokenFile = new File(KCF_runtimeRoot.fsName + "/backend/.local-token");
             data = tokenFile.exists ? KCF_hostRead(tokenFile).replace(/\s/g, "") : "";
             break;
         case "chooseMedia":
             var media = File.openDialog("Choose video or audio with speech");
-            data = media ? { path: media.fsName, name: decodeURI(media.name) } : null;
+            data = media ? { path: media.fsName, name: decodeURIComponent(media.name) } : null;
             break;
         case "selectedMedia":
             var comp = app.project && app.project.activeItem;
@@ -102,7 +107,7 @@ function KCF_dispatch(json) {
             var layers = comp.selectedLayers;
             for (var i = 0; i < layers.length; i++) {
                 var source = layers[i].source;
-                if (source && source.file) { data = { path: source.file.fsName, name: decodeURI(source.file.name) }; break; }
+                if (source && source.file) { data = { path: source.file.fsName, name: decodeURIComponent(source.file.name) }; break; }
             }
             if (!data) { throw new Error("Select a video or audio footage layer in the active composition."); }
             break;
@@ -123,7 +128,7 @@ function KCF_dispatch(json) {
             break;
         case "generate":
             KCF_hostValidate(payload.document, payload.settings);
-            data = { name: KCF_generate(payload.document, payload.settings) }; break;
+            data = { name: KCF_engine.generate(payload.document, payload.settings) }; break;
         default: throw new Error("Unknown CapForge action.");
         }
         return JSON.stringify({ ok: true, data: data });

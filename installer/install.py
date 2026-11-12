@@ -24,8 +24,7 @@ def wizard(target: Path | None = None, extensions: Path | None = None) -> None:
     try:
         window = tk.Tk()
     except tk.TclError as error:
-        print(f"The graphical installer could not open: {error}\nUse --headless to install from a terminal.")
-        return
+        raise RuntimeError(f"The graphical installer could not open: {error}\nOpen CapForge Setup again to retry, or use --headless from a terminal.") from error
     window.title("Install CapForge")
     geometry, wrap = theme.layout(float(window.tk.call("tk", "scaling")))
     window.geometry(geometry)

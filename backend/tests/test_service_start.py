@@ -27,7 +27,7 @@ class TestServiceStart(unittest.TestCase):
             self.assertEqual(service.start(8765, "test-token"), 0)
 
     def test_health_and_authenticated_providers_are_both_required(self):
-        health = {"ok": True, "availableProviders": [], "ffmpeg": True}
+        health = {"ok": True, "version": service.VERSION, "availableProviders": [], "ffmpeg": True}
         responses = [BytesIO(json.dumps(health).encode()), BytesIO(b'{"providers":[]}')]
         with patch.object(service.HTTP, "open", side_effect=responses) as http:
             self.assertTrue(service.ready(8765, "test-token"))
@@ -37,6 +37,13 @@ class TestServiceStart(unittest.TestCase):
                 self.assertFalse(service.ready(8765, "test-token"))
         with patch.object(service.HTTP, "open", side_effect=OSError("unauthorized")):
             self.assertFalse(service.ready(8765, "test-token"))
+
+    def test_authenticated_older_service_requires_restart_instead_of_silent_reuse(self):
+        health = {"ok": True, "version": "0.2.0", "availableProviders": [], "ffmpeg": True}
+        responses = [BytesIO(json.dumps(health).encode()), BytesIO(b'{"providers":[]}')]
+        with patch.object(service.HTTP, "open", side_effect=responses):
+            with self.assertRaisesRegex(RuntimeError, "[Rr]estart"):
+                service.start(8765, "test-token")
 
     def test_local_token_cannot_follow_a_redirect_to_another_host(self):
         self.assertIsNone(service.NoRedirect().redirect_request(None, None, 302, "", {}, "https://other.example"))

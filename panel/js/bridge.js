@@ -20,7 +20,10 @@
             initialization = Promise.resolve().then(function () {
                 var path = root.__adobe_cep__.getSystemPath("extension");
                 if (!path) { throw new Error("Adobe did not provide the CapForge extension path. Reopen the panel inside After Effects."); }
-                path = decodeURI(path).replace(/^file:\/\/\/([a-z]:)/i, "$1").replace(/^file:\/\//i, "").replace(/\\/g, "/").replace(/\/$/, "");
+                // CEP normally returns a file URL; a native path can contain a
+                // literal percent sign, which must not be URI-decoded.
+                if (/^file:\/\//i.test(path)) { path = decodeURIComponent(path); }
+                path = path.replace(/^file:\/\/\/([a-z]:)/i, "$1").replace(/^file:\/\//i, "").replace(/\\/g, "/").replace(/\/$/, "");
                 return evaluate("$.evalFile(new File(" + literal(path + "/host.jsx") + ")); KCF_initialize(" + literal(path) + ")");
             }).catch(function (error) { initialization = null; throw error; });
         }

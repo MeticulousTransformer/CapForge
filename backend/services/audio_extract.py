@@ -48,7 +48,9 @@ def extract_audio(media_path: str, out_dir: str) -> str:
         "-vn", "-ac", "1", "-ar", "16000", "-c:a", "pcm_s16le",
         out_path,
     ]
-    proc = subprocess.run(cmd, capture_output=True, text=True)
+    # ffmpeg diagnostics include media filenames, independent of Windows' ANSI
+    # code page. Undecodable log bytes must not reject a successfully made WAV.
+    proc = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace")
     if proc.returncode != 0 or not os.path.isfile(out_path):
         tail = (proc.stderr or "")[-800:]
         raise RuntimeError(f"ffmpeg failed (code {proc.returncode}): {tail}")

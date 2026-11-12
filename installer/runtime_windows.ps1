@@ -73,7 +73,7 @@ function Initialize-CapForgeRuntime {
     }
     [void][IO.Directory]::CreateDirectory($Root)
     if (-not (Test-CapForgeOwned $Root)) {
-        $record = @{tool='CapForge'; version='0.3.0'; runtimeRoot=$Root; bootstrap=$true} | ConvertTo-Json
+        $record = @{tool='CapForge'; version='0.3.2'; runtimeRoot=$Root; bootstrap=$true} | ConvertTo-Json
         [IO.File]::WriteAllText((Join-Path $Root '.kcf-install.json'), $record, (New-Object Text.UTF8Encoding $false))
     }
     $manifest = Get-Content -LiteralPath $ManifestPath -Raw | ConvertFrom-Json

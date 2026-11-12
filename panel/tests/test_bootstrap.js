@@ -2,6 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
+const os = require('node:os');
 const vm = require('node:vm');
 const repo = path.resolve(__dirname, '../..');
 
@@ -30,7 +31,7 @@ test('host loads source engine using the explicit CEP path, with no native JSON'
 });
 
 test('installed bootstrap reads its separate runtime and tolerates a UTF-8 BOM', () => {
-    const base = fs.mkdtempSync(path.join(repo, '.studio-test/bootstrap-'));
+    const base = fs.mkdtempSync(path.join(os.tmpdir(), 'capforge-bootstrap-'));
     try {
         const extension = path.join(base, 'CEP with spaces ქართული'); fs.mkdirSync(extension);
         fs.copyFileSync(path.join(repo, 'ae/lib/json2.js'), path.join(extension, 'json2.js'));
@@ -62,4 +63,19 @@ test('failed initialization can retry after the installation is repaired', async
     vm.runInNewContext(fs.readFileSync(path.join(repo, 'panel/js/bridge.js'), 'utf8'), {window});
     await assert.rejects(window.KCF_Bridge.call('context'), /Missing engine/);
     assert.equal(await window.KCF_Bridge.call('context'), true);
+});
+
+test('bridge preserves literal percent names and decodes reserved characters in file URLs', async () => {
+    for (const [raw, normalized] of [
+        ['C:\\Users\\100% editor\\CEP', 'C:/Users/100% editor/CEP'],
+        ['/Users/editor%20name/CEP', '/Users/editor%20name/CEP'],
+        ['file:///Users/editor%23one/100%25%20%E1%83%A5%E1%83%90%E1%83%A0%E1%83%97%E1%83%A3%E1%83%9A%E1%83%98/CEP', '/Users/editor#one/100% ქართული/CEP'],
+        ['file:///C:/Users/editor%26studio/CEP', 'C:/Users/editor&studio/CEP']
+    ]) {
+        const codes = [];
+        const window = {__adobe_cep__: {getSystemPath: () => raw, evalScript(code, callback) {codes.push(code); callback('{"ok":true,"data":true}');}}};
+        vm.runInNewContext(fs.readFileSync(path.join(repo, 'panel/js/bridge.js'), 'utf8'), {window});
+        await window.KCF_Bridge.call('context');
+        assert.ok(codes[0].includes('KCF_initialize(' + JSON.stringify(normalized) + ')'), raw);
+    }
 });

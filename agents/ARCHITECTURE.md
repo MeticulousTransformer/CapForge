@@ -12,6 +12,7 @@ panel/js/word_styles.js         generated adapter of the AE shuffle engine
 panel/js/preview.js             approximate canvas rendering + motion
 panel/js/bridge.js              JSON calls to the CEP host
 panel/js/api.js                 authenticated loopback service requests
+panel/js/updates.js             release check/status and verified Setup handoff
 panel/js/provider_guide.js      editable AI setup content and trusted account URLs
 panel/js/external_links.js      opens allowlisted setup URLs in the regular browser
 panel/js/app.js                 connects the above, no rendering engine
@@ -31,6 +32,7 @@ backend/providers/*.py          interchangeable ASR adapters
 backend/services/grouping.py    real word timings → caption groups
 backend/services/studio_settings.py  local token + provider credential persistence
 backend/services/transcript_validation.py  imported timeline validation
+backend/services/updates.py     official release download, verification, Setup launch
 
 installer/environment.py        prerequisite checks + platform paths
 installer/theme.py              installer colors and fixed window dimensions
@@ -39,8 +41,11 @@ installer/runtime_windows.ps1   private runtime download and path validation
 installer/bootstrap_windows.ps1 native loading UI before Python exists
 installer/bootstrap_macos.sh    private runtime bootstrap using macOS tools
 installer/deployment.py         owned installation, backups, rollback
+installer/service_control.py    authenticated idle service shutdown before updates
 installer/install.py            native wizard + command-line entry
 scripts/package_release.py      explicit release file allowlist
+scripts/check_release.py        complete tests, version and archive checks
+.github/workflows/release.yml   tested kml pushes become in-app updates
 ```
 
 The modern panel uses **CEP**, because ScriptUI cannot host a modern animated

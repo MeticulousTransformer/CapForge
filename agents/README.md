@@ -39,6 +39,10 @@ node ae/tests/test_background_opacity.js
 node ae/tests/test_style_shuffle.js
 node ae/tests/test_slide_in.js
 node ae/tests/test_fit_boundary.js
+node ae/tests/test_bootstrap.js
+node panel/tests/test_api.js
+node panel/tests/test_updates.js
+python scripts/check_release.py
 ```
 
 On Windows, `.venv\Scripts\python.exe` can replace `python`. If a sandbox blocks

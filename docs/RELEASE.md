@@ -1,19 +1,24 @@
 # Release candidate → commercial distribution
 
-This implementation is **v0.3.1, an unsigned release candidate**. The polished
-interface and guided source installer are usable, but a ZIP is not a signed,
-fully validated commercial release.
+This implementation is **v0.3.2, an unsigned distribution**. The local Mac
+bootstrap and AE 26.5 engine have been exercised; see `VALIDATION.md` for the
+evidence and its limits. A ZIP is not an Apple-notarized or Adobe-signed package.
 
 Create the clean source package:
 
 ```text
-python scripts/package_release.py
+python scripts/check_release.py --package
 ```
 
 The allowlist excludes `.env`, tokens, exports, models, `.venv`, Git history,
 presentation build folders and other local artifacts. The ZIP includes the
 offline design demo, guided installers, caption engine, backend, fixtures and
 agent documentation. Runtime updates preserve keys and exports.
+
+Pushing to `kml` runs `.github/workflows/release.yml`. It checks Windows and Intel
+Mac, builds the Windows EXE, tests that exact archive on Apple Silicon, and
+publishes it for the in-app update check only after passing. See `UPDATES.md`.
+These workflow files must be pushed before automated publishing is active.
 
 Before selling:
 

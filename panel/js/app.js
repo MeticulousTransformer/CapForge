@@ -6,6 +6,7 @@
     var settings = window.KCF_Settings, titles = window.KCF_Titles, controls = window.KCF_DesignControls;
     var fontGroups = Object.create(null);
     var providerGuide = window.KCF_ProviderGuide;
+    var updates = window.KCF_Updates.create(api, {status: $("update-status"), notes: $("update-notes"), check: $("check-updates"), install: $("install-update")});
     var state = { doc: transcript.demo("ka-GE"), look: settings.normalize({}), media: null, providers: [], connected: false, ffmpeg: false, busy: false, category: "All", comp: null, renderedCaption: null, wordLimit: 80 };
     var guideFocus = null;
     try {
@@ -25,6 +26,7 @@
     function currentProvider() { return state.providers.filter(function (p) { return p.id === $("provider").value; })[0]; }
     function readiness() {
         var provider = currentProvider(), live = bridge.available;
+        updates.setEnabled(live && state.connected && !state.busy);
         $("generate").disabled = !live || state.busy || !state.doc || !state.comp;
         $("transcribe").disabled = !live || state.busy || !state.media || !state.connected || !state.ffmpeg || !provider || !provider.available;
         $("prepare-audio").disabled = !live || state.busy || !state.media || !state.connected || !state.ffmpeg;
@@ -291,6 +293,8 @@
     $("save-look").addEventListener("click", function () { operation("Saving look…", function () { return exportFile("capforge-look.json", { tool: "CapForge", version: 1, settings: state.look }, "look"); }); });
     $("load-look").addEventListener("click", function () { $("look-file").click(); }); $("look-file").addEventListener("change", function () { readJSON(this, function (data) { if (!settings.isSavedLook(data) || !titles.get(data.settings.preset)) { throw new Error("Choose a CapForge look exported by this panel."); } state.look = settings.normalize(data.settings); syncLook(); gallery(); status("Look loaded"); }); });
     $("reconnect").addEventListener("click", function () { operation("Checking connection…", connect); });
+    $("check-updates").addEventListener("click", function () { operation("Checking for updates…", function () { return updates.check().then(function () { status("Update check finished"); }); }); });
+    $("install-update").addEventListener("click", function () { operation("Preparing update…", function () { return updates.install().then(function () { status("Update setup is opening"); }); }); });
     $("scan-providers").addEventListener("click", function () { operation("Refreshing providers…", connect); });
     $("prepare-audio").addEventListener("click", function () { operation("Preparing audio…", function () { return api.request("/extract_audio", {mediaPath: state.media.path}).then(function (result) { status("Audio prepared · " + result.duration.toFixed(1) + "s"); notice("WAV saved: " + result.audio); }); }); });
     $("start-service").addEventListener("click", function () { operation("Checking local service…", function () {

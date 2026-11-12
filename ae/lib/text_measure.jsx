@@ -30,6 +30,9 @@ function KCF_timestamp() {
 function KCF_styleTextLayer(textLayer, style) {
     var prop = textLayer.property("Source Text");
     var doc = prop.value;
+    // New AE text inherits the editor's Character panel state (including
+    // All Caps and scaling). Start clean before applying this caption's style.
+    doc.resetCharStyle();
     if (style.font) { doc.font = style.font; }
     doc.fontSize = style.fontSize;
     doc.tracking = style.tracking;

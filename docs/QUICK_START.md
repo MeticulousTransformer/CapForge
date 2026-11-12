@@ -1,7 +1,8 @@
 # Your first captions
 
 1. Extract the entire CapForge package. Connect to the internet for first setup.
-2. Close AE. Double-click **CapForge Setup.exe** (Windows) or **Install macOS.command**.
+2. Close AE. Double-click **CapForge Setup.exe** (Windows; **Install Windows.cmd**
+   is the fallback) or **Install macOS.command** (Mac).
    The launcher prepares CapForge's private runtime automatically. Click
    **Install CapForge** in the wizard; audio and transcription support are
    installed for you. No Python download or PATH setup is needed. This preview build needs
@@ -26,6 +27,16 @@ provider charges. The canvas shows a design approximation, not an AE render.
 **Save your work:** Export JSON saves your edited wording and original timings.
 Save look exports reusable visual settings. Keep your AE project saved as usual.
 Generated keyframes remain editable even without the panel.
+
+**Updates:** In Setup, choose **Check for updates**, then **Update** when offered.
+CapForge downloads and checks the package and opens Setup for you. Save your AE
+project, close AE, and click Install. Reopen AE afterward. Setup closes the old
+local service automatically and preserves your keys and exports. An older
+service from before v0.3.2 may need its window closed once before updating.
+
+**Mac access-privileges error:** use the ZIP attached to the latest release and
+extract the entire package. The v0.3.2 launcher includes the correct permissions;
+the old download needs replacing. Avoid sharing the installer file by itself.
 
 **Source alignment:** Transcription starts at the source file's beginning.
 Selecting a trimmed or offset footage layer does not change that. Move the

@@ -30,7 +30,9 @@ before extraction. Everything is kept in the app's `.runtime/` folder. uv is
 invoked with `--no-bin --no-registry --managed-python --no-config`; no global
 Python registration or PATH configuration is performed.
 
-The transcription service gets its own virtual environment. Its requirements
+The transcription service gets its own virtual environment. Its pinned requirements
+live in `backend/requirements-lock.txt`, including transitive dependencies, so
+fresh installations use the versions checked for this release. Its requirements
 include `imageio-ffmpeg`, whose platform wheels include an audio-processing
 binary. A manually installed ffmpeg is still supported, but is optional.
 
@@ -45,6 +47,14 @@ be retried. The installer never replaces unrelated nonempty destinations and
 backs up existing code and the panel before replacing them.
 If an earlier Python installation was removed and left a broken service
 environment, setup keeps that environment in backups and builds a replacement.
+
+**v0.3.2:** Mac launchers are executable in both the checkout and ZIP, and release
+packaging enforces Unix line endings even when built on Windows. Fresh Mac setup
+creates a valid ownership record before downloading. Setup failures return a
+failure status, allowing retry. Updates stop only the authenticated service that
+belongs to this installation; active transcription blocks replacement. The
+in-app updater uses the separate private Python to open Setup, avoiding locked
+service dependencies on Windows. See [updates](UPDATES.md).
 
 The preview build still uses Adobe's unsigned-extension option. Its checkbox is
 explicit in the wizard. A signed commercial installer and clean-machine Mac/AE

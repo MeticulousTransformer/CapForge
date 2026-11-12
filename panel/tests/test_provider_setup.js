@@ -91,6 +91,7 @@ test('setup flow clears switched keys, handles Azure region and selects the save
     };
     const document = {getElementById: $, createElement: () => element(), body: element(), addEventListener() {},
         querySelector: () => element(), querySelectorAll: selector => selector === '.tab-pane' ? panes : []};
+    vm.runInNewContext(fs.readFileSync(path.join(root, 'panel/js/updates.js'), 'utf8'), {window});
     vm.runInNewContext(fs.readFileSync(path.join(root, 'panel/js/app.js'), 'utf8'), {
         window, document, localStorage: {getItem: key => storage.get(key) || null, setItem: (key, value) => storage.set(key, value)}
     });

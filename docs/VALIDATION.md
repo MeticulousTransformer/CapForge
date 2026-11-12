@@ -1,4 +1,55 @@
-# v0.3.1 validation
+# v0.3.2 validation — 12 November 2026
+
+- **238 automated tests passed:** 82 backend, 28 installer, 11 release/package,
+  and 117 AE/panel tests. The full release checker also passed version parity,
+  shell syntax and archive generation. Tests exercised real loopback shutdown.
+- Reproduced the reported `KCF_PRESET_LABELS is undefined` inside AE 26.5 on
+  Apple Silicon. `$.evalFile` declarations were local to initialization; later
+  dispatch could not read them. After the closure fix, context lists all 13
+  presets and generation works across separate calls.
+- Real AE generation: Georgian and English fixtures across all 13 presets
+  (26 runs), with exact source text/word metadata, in/out points and keyframe
+  checks. Existing composition snapshots remained unchanged. Representative
+  Georgian and English frames were rendered and visually inspected.
+- Visual inspection found inherited All Caps. AE confirmed that resetting
+  character style clears it; two final rendered examples preserve source case,
+  selected typography, exact word timings and active highlights.
+- AE PNG exports complete after the script returns. The initial immediate
+  `File.exists` assertion reported failure; filesystem verification and visual
+  inspection confirmed both exports. This was a QA harness timing issue.
+- Actual Mac setup in an empty isolated folder with spaces and Georgian text:
+  SHA-256-checked uv download, private Python 3.12.15, Tk readiness, service
+  dependencies and CEP deployment succeeded. No preinstalled Python/ffmpeg was
+  used by that bootstrap. A separate bundled-ffmpeg check converted a real test
+  WAV to 16 kHz mono.
+- Actual installed service/update integration: authenticated root identity,
+  Georgian regrouping without timing changes, graceful process exit before
+  replacement, dependency installation, token/export preservation, and bundled
+  audio conversion all passed.
+- The generated ZIP was extracted with macOS `ditto` and its launcher installed
+  successfully into another empty folder with spaces and Georgian text. Final
+  ownership checks exposed a case-insensitive path comparison bug; updater and
+  installer now compare physical directory identity. Regression tests cover
+  differently capitalized paths and reject linked runtimes/external interpreters.
+- Windows Unicode repair was reproduced with a real child Python process using
+  cp1252 output and a Georgian interpreter path. ASCII-safe JSON now preserves
+  that path instead of incorrectly rebuilding a healthy service environment.
+- UI update flow checked in Chrome with a simulated AE host/release response:
+  Check for updates → Update → Setup handoff message. Narrow 440-pixel viewport
+  had no horizontal overflow; no console errors. This does not establish a
+  published GitHub release or a real remote update download.
+- Release tests cover Windows line endings in Mac scripts, executable ZIP
+  metadata, missing engine files, private-file exclusion, hashes and release
+  identity. Installer tests cover fresh `plutil` records, failed/broken runtimes,
+  external-Python migration, rollback, busy services and unrelated services.
+
+Still external to this local validation: running the new GitHub workflow on
+Windows/Intel Mac, signed/notarized distribution, paid-provider transcription,
+and actual playback on other AE versions. The workflow is prepared locally;
+no release has been published by this work. The Mac-built ZIP includes the
+Windows CMD fallback; GitHub's Windows packaging job adds the native EXE.
+
+## Historical v0.3.1 validation
 
 22 October 2026 connection fix:
 

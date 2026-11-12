@@ -1,6 +1,6 @@
 # CapForge
 
-## Studio v0.3.1 — preview release
+## Studio v0.3.2
 
 A new dockable **CEP panel** wraps the existing caption engine in a focused
 studio interface. It has a built-in animated caption screen, thirteen searchable
@@ -14,7 +14,8 @@ and styles, flexible wrapping, boundary fitting, full shadows/outlines/boxes and
 seeded word-style shuffle. Controls are grouped into Motion, Typography, Layout,
 Finish and Style shuffle. Saved looks include every setting.
 
-**Start here:** double-click `CapForge Setup.exe` on Windows or `Install macOS.command`
+**Start here:** double-click `CapForge Setup.exe` on Windows (`Install Windows.cmd`
+if the EXE is absent) or `Install macOS.command` on Mac
 from the extracted package. The guided installer checks prerequisites, installs
 for your user and preserves existing keys/exports when updating. The launcher
 automatically prepares a private runtime; the wizard installs audio preparation
@@ -25,10 +26,15 @@ Open **Window → Extensions → CapForge** after restarting AE.
 Explore the demo, or open **Setup** to start the local service and add a provider
 key. Select an AE composition before generating captions.
 
-v0.3.1 fixes engine loading inside AE by using Adobe’s extension path explicitly.
-Start service reconnects to an existing authenticated CapForge service instead
-of launching a second instance. A port used by another app gets a connection
-message rather than an instruction to reinstall.
+v0.3.2 fixes the `KCF_PRESET_LABELS is undefined` error, Finder launch permissions,
+fresh Mac setup, inherited All Caps formatting, and media paths containing
+Georgian or special characters. Setup installs a private Python runtime and the
+same pinned dependencies on each device, including bundled audio tools.
+
+**Updates:** open **Setup → Check for updates → Update**. CapForge downloads and
+verifies the official release, then opens Setup. Save your project and close AE
+before clicking Install; reopen AE after setup. Saved keys, exports and looks
+are preserved. See [updates and publishing](docs/UPDATES.md).
 
 The service accepts both local origins used by Adobe CEP (`file://` and `null`),
 so the installed panel can connect without the erroneous “This service only
@@ -41,13 +47,15 @@ require the installation token; web origins remain blocked.
 - [Add a removable title style](agents/ADD_TITLE.md)
 - [Commercial release checklist](docs/RELEASE.md)
 - Browser design demo: open `panel/index.html` locally; no install or API key needed.
-- Build a clean distribution: `python scripts/package_release.py`.
+- Check and build a distribution: `python scripts/check_release.py --package`.
 - [Checks passed and remaining validation](docs/VALIDATION.md)
 
-**Release status:** the panel is an unsigned release candidate. The installer
-offers Adobe's per-user unsigned-extension mode for this preview. A commercial
-distribution needs signing, clean macOS/Windows installation testing and real AE
-playback validation. The manifest's host range is not a tested compatibility claim.
+**Release status:** this package is unsigned. The installer offers Adobe's
+per-user unsigned-extension mode. Local validation covers Apple Silicon Mac
+installation and AE 26.5 generation; the automated release workflow also requires
+Windows and Intel Mac installation checks. Signing and broader AE-version
+validation remain separate release work. The manifest's host range is not a
+tested compatibility claim.
 
 **Local service:** API calls now require an installation token in
 `backend/.local-token` (generated on service startup). The panel reads it locally;

@@ -30,7 +30,11 @@ def ready(port: int, token: str) -> bool:
             return False
         with HTTP.open(Request(base + "/providers", headers={"X-KCF-Token": token}), timeout=1) as response:
             providers = json.loads(response.read(1024 * 1024))
-        return isinstance(providers, dict) and isinstance(providers.get("providers"), list)
+        if not isinstance(providers, dict) or not isinstance(providers.get("providers"), list):
+            return False
+        if health.get("version") != VERSION:
+            raise RuntimeError("An older or different CapForge service is still running. Restart this computer, then start CapForge again to finish the update.")
+        return True
     except (OSError, ValueError, TypeError):
         return False
 

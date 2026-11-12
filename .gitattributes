@@ -1,0 +1,3 @@
+# Mac launchers must remain executable scripts when a release is built on Windows.
+*.sh text eol=lf
+*.command text eol=lf
