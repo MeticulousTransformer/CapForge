@@ -116,7 +116,16 @@ test("installed host loads from a separate runtime with spaces and Georgian char
     try {
         const extension = path.join(base, "CEP ქართული"), runtime = path.join(base, "Runtime ქართული");
         fs.mkdirSync(extension);
-        fs.cpSync(path.join(repo, "ae"), path.join(runtime, "ae"), { recursive: true });
+        // Node 22's native cpSync can lose files in Unicode Windows paths
+        // (nodejs/node#61878). Build the fixture with individual file copies.
+        for (const directory of ["lib", "titles"]) {
+            const source = path.join(repo, "ae", directory);
+            const destination = path.join(runtime, "ae", directory);
+            fs.mkdirSync(destination, { recursive: true });
+            for (const filename of fs.readdirSync(source)) {
+                fs.copyFileSync(path.join(source, filename), path.join(destination, filename));
+            }
+        }
         assert.ok(fs.existsSync(path.join(runtime, "ae/lib/json2.js")), "Installed fixture must contain the copied JSON shim");
         fs.copyFileSync(path.join(repo, "ae/lib/json2.js"), path.join(extension, "json2.js"));
         fs.writeFileSync(path.join(extension, "install.json"), "\uFEFF" + JSON.stringify({ tool: "CapForge", runtimeRoot: runtime }));
