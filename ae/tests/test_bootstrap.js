@@ -11,7 +11,9 @@ const repo = path.resolve(__dirname, "../..");
 
 function host() {
     function File(name) {
-        this.fsName = String(name);
+        // Adobe File.fsName returns a normalized native path. In particular,
+        // Windows callers can append URI-style slashes to a native folder.
+        this.fsName = path.resolve(String(name));
         this.name = encodeURIComponent(path.basename(this.fsName));
         this.exists = fs.existsSync(this.fsName);
     }
@@ -115,10 +117,12 @@ test("installed host loads from a separate runtime with spaces and Georgian char
         const extension = path.join(base, "CEP ქართული"), runtime = path.join(base, "Runtime ქართული");
         fs.mkdirSync(extension);
         fs.cpSync(path.join(repo, "ae"), path.join(runtime, "ae"), { recursive: true });
+        assert.ok(fs.existsSync(path.join(runtime, "ae/lib/json2.js")), "Installed fixture must contain the copied JSON shim");
         fs.copyFileSync(path.join(repo, "ae/lib/json2.js"), path.join(extension, "json2.js"));
         fs.writeFileSync(path.join(extension, "install.json"), "\uFEFF" + JSON.stringify({ tool: "CapForge", runtimeRoot: runtime }));
         const context = host();
         const initialized = JSON.parse(context.KCF_initialize(extension));
+        assert.equal(context.KCF_runtimeRoot.fsName, path.resolve(runtime), "Installation marker must preserve the exact runtime path");
         assert.equal(initialized.ok, true, initialized.error);
         const response = dispatch(context, "context");
         assert.equal(response.ok, true, response.error);

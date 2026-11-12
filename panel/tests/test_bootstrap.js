@@ -7,7 +7,7 @@ const vm = require('node:vm');
 const repo = path.resolve(__dirname, '../..');
 
 function host() {
-    function File(name) {this.fsName = String(name); this.name = path.basename(this.fsName); this.exists = fs.existsSync(this.fsName);}
+    function File(name) {this.fsName = path.resolve(String(name)); this.name = path.basename(this.fsName); this.exists = fs.existsSync(this.fsName);}
     function Folder(name) {this.fsName = path.resolve(String(name)); this.exists = fs.existsSync(this.fsName);}
     Object.defineProperty(File.prototype, 'parent', {get() {return new Folder(path.dirname(this.fsName));}});
     Object.defineProperty(Folder.prototype, 'parent', {get() {return new Folder(path.dirname(this.fsName));}});
