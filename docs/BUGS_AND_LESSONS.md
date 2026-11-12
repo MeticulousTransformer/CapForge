@@ -363,3 +363,25 @@ install correctly and still show an OS trust prompt. The
 [Mac](INSTALL_MAC.md) and [Windows](INSTALL_WINDOWS.md) guides explain that status
 and the available per-app choices. Keep evidence equally specific: package tests
 show installation behavior; desktop checks show the actual opening experience.
+
+## 15. A program inherits more than its arguments
+
+The packaged Windows installer failed even though its unit tests passed. Its
+first CI report only said `exit code 1`. The GUI executable had no console, so
+output from PowerShell and Python disappeared. Explicit output pipes now carry
+both normal messages and errors through those stages. Reading both streams
+concurrently also prevents a full error pipe from blocking the child process.
+
+With those messages visible, the real error was `Get-FileHash` not being found.
+GitHub started PowerShell 7, which started Python, which started CapForge's EXE,
+which started Windows PowerShell 5.1. The older shell inherited the newer shell's
+module search paths. Microsoft documents this exact intermediate-process case:
+Windows PowerShell can find incompatible PowerShell 7 modules before its own.
+The launcher now removes `PSModulePath` only from the child process environment,
+allowing Windows PowerShell to construct its own defaults. It does not change
+the user's system settings or weaken download verification.
+
+Read [Microsoft's explanation of module search paths](https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_psmodulepath?view=powershell-7.6).
+The lesson: arguments, environment variables, input/output handles, and working
+directory are all inputs to a program. A test of the real executable can reveal
+problems that a direct call to one function cannot.

@@ -1,6 +1,7 @@
 """Source ZIP safety on every platform; compiled launcher behavior on Windows."""
 import hashlib
 import json
+import os
 from pathlib import Path
 import subprocess
 import sys
@@ -94,9 +95,11 @@ class WindowsLauncherTests(unittest.TestCase):
         cls.archive = cls.root / "test-source.zip"
         bootstrap = '''param([switch]$Headless,[string]$RuntimeRoot,[string]$ExtensionRoot,[switch]$EnableUnsigned)
 [Console]::OutputEncoding = New-Object Text.UTF8Encoding $false
+[void](Get-Command Get-FileHash -ErrorAction Stop)
+[void](Get-Command Expand-Archive -ErrorAction Stop)
 Write-Output ('bootstrap-output: ' + $RuntimeRoot)
 [Console]::Error.WriteLine('bootstrap-error: test failure')
-@{headless=$Headless.IsPresent; root=$RuntimeRoot; extensions=$ExtensionRoot; unsigned=$EnableUnsigned.IsPresent; source=$PSScriptRoot} |
+@{headless=$Headless.IsPresent; root=$RuntimeRoot; extensions=$ExtensionRoot; unsigned=$EnableUnsigned.IsPresent; source=$PSScriptRoot; modulePath=$env:PSModulePath} |
     ConvertTo-Json | Set-Content -LiteralPath $RuntimeRoot -Encoding UTF8
 exit 23
 '''
@@ -112,8 +115,10 @@ exit 23
     def test_headless_arguments_unicode_and_exit_code_survive_native_handoff(self):
         report = self.root / "installed result ქართული.json"
         extensions = str(self.root / "CEP $literal & ქართული") + "\\"
+        incompatible_modules = str(self.root / "PowerShell 7 modules")
         result = subprocess.run([str(self.executable), "--headless", "--target", str(report),
                                  "--extension-root", extensions, "--enable-unsigned"],
+                                env={**os.environ, "PSModulePath": incompatible_modules},
                                 capture_output=True, text=True, encoding="utf-8", timeout=45)
         self.assertEqual(result.returncode, 23)
         self.assertIn("bootstrap-output:", result.stdout)
@@ -122,6 +127,7 @@ exit 23
         captured = json.loads(report.read_text(encoding="utf-8-sig"))
         self.assertTrue(captured["headless"])
         self.assertTrue(captured["unsigned"])
+        self.assertNotIn(incompatible_modules, captured["modulePath"] or "")
         # .NET expands Windows 8.3 aliases (RUNNER~1) to their long paths.
         self.assertEqual(Path(captured["root"]).resolve(), report.resolve())
         self.assertEqual(Path(captured["extensions"]).resolve(), Path(extensions).resolve())

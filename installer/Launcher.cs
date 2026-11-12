@@ -89,6 +89,9 @@ internal static class Launcher
             start.WorkingDirectory = folder;
             start.UseShellExecute = false;
             start.CreateNoWindow = true;
+            // PowerShell 7 -> Python -> this EXE can inherit incompatible PS7 module paths.
+            // Let Windows PowerShell build its own module path (hashing and ZIP cmdlets).
+            start.EnvironmentVariables.Remove("PSModulePath");
             if (options.Headless)
             {
                 start.RedirectStandardOutput = true;
