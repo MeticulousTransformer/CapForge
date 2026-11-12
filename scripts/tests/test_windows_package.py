@@ -115,8 +115,11 @@ exit 23
         captured = json.loads(report.read_text(encoding="utf-8-sig"))
         self.assertTrue(captured["headless"])
         self.assertTrue(captured["unsigned"])
-        self.assertEqual(captured["root"], str(report))
-        self.assertEqual(captured["extensions"], extensions)
+        # .NET expands Windows 8.3 aliases (RUNNER~1) to their long paths.
+        self.assertEqual(Path(captured["root"]).resolve(), report.resolve())
+        self.assertEqual(Path(captured["extensions"]).resolve(), Path(extensions).resolve())
+        self.assertEqual(Path(captured["extensions"]).name, "CEP $literal & ქართული")
+        self.assertTrue(captured["extensions"].endswith("\\"))
         self.assertFalse(Path(captured["source"]).exists(), "Temporary source must be cleaned after child exits")
 
     def test_extract_only_preserves_source_and_refuses_existing_destination(self):
