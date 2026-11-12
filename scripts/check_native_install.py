@@ -20,7 +20,13 @@ def main():
         # destination so the installer's symlink protection stays enabled.
         root = Path(folder).resolve()
         runtime, extensions = root / 'Fresh install/CapForge', root / 'Adobe extensions'
-        subprocess.run([str(args.installer.resolve()), '--headless', '--target', str(runtime), '--extension-root', str(extensions)], check=True, timeout=1500)
+        # Give a Windows GUI-subsystem EXE real output handles, and preserve its
+        # diagnostic output before the temporary installation is cleaned up.
+        result = subprocess.run(
+            [str(args.installer.resolve()), '--headless', '--target', str(runtime), '--extension-root', str(extensions)],
+            stdout=subprocess.PIPE, stderr=subprocess.STDOUT, encoding='utf-8', errors='replace', timeout=1500)
+        print(result.stdout, flush=True)
+        result.check_returncode()
         python = runtime / ('.venv/Scripts/python.exe' if args.platform == 'windows' else '.venv/bin/python')
         subprocess.run([str(python), '-m', 'pip', 'check'], check=True)
         subprocess.run([str(python), '-I', str(Path(__file__).parent / 'check_installed_runtime.py'), str(runtime)], check=True)

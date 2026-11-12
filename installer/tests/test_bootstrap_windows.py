@@ -24,6 +24,8 @@ class WindowsBootstrapTests(unittest.TestCase):
             (source / "install.py").write_text(
                 "import json, os, pathlib, sys\n"
                 "pathlib.Path(os.environ['CAPFORGE_TEST_REPORT']).write_text(json.dumps(sys.argv[1:]), encoding='utf-8')\n"
+                "print('installer-output: ' + sys.argv[2])\n"
+                "print('installer-error: test failure', file=sys.stderr)\n"
                 "raise SystemExit(31)\n", encoding="utf-8")
             report = source / "arguments.json"
             runtime = source / "Runtime $literal & ქართული"
@@ -32,8 +34,11 @@ class WindowsBootstrapTests(unittest.TestCase):
                 "powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File",
                 str(source / "bootstrap_windows.ps1"), "-Headless", "-RuntimeRoot", str(runtime),
                 "-ExtensionRoot", str(extensions), "-EnableUnsigned",
-            ], env={**os.environ, "CAPFORGE_TEST_PYTHON": sys.executable, "CAPFORGE_TEST_REPORT": str(report)}, timeout=30)
+            ], env={**os.environ, "CAPFORGE_TEST_PYTHON": sys.executable, "CAPFORGE_TEST_REPORT": str(report)},
+                capture_output=True, text=True, encoding="utf-8", timeout=30)
             self.assertEqual(result.returncode, 31)
+            self.assertIn("installer-output: " + str(runtime), result.stdout)
+            self.assertIn("installer-error: test failure", result.stderr)
             self.assertEqual(json.loads(report.read_text()), [
                 "--target", str(runtime), "--extension-root", str(extensions), "--enable-unsigned", "--headless"])
 

@@ -38,6 +38,12 @@ internal static class Launcher
         bool quiet = Array.IndexOf(args, "--headless") >= 0 || Array.IndexOf(args, "--extract-only") >= 0;
         try
         {
+            if (quiet)
+            {
+                // A GUI-subsystem EXE has no console; use the caller's redirected handles.
+                Console.SetOut(new StreamWriter(Console.OpenStandardOutput(), new UTF8Encoding(false)) { AutoFlush = true });
+                Console.SetError(new StreamWriter(Console.OpenStandardError(), new UTF8Encoding(false)) { AutoFlush = true });
+            }
             Options options = ParseOptions(args);
             string folder = AppDomain.CurrentDomain.BaseDirectory;
             using (Stream payload = Assembly.GetExecutingAssembly().GetManifestResourceStream(PayloadName))
@@ -83,8 +89,32 @@ internal static class Launcher
             start.WorkingDirectory = folder;
             start.UseShellExecute = false;
             start.CreateNoWindow = true;
-            using (Process setup = Process.Start(start))
+            if (options.Headless)
             {
+                start.RedirectStandardOutput = true;
+                start.RedirectStandardError = true;
+                start.StandardOutputEncoding = Encoding.UTF8;
+                start.StandardErrorEncoding = Encoding.UTF8;
+            }
+            using (Process setup = new Process())
+            {
+                setup.StartInfo = start;
+                if (options.Headless)
+                {
+                    setup.OutputDataReceived += delegate(object sender, DataReceivedEventArgs data) {
+                        if (data.Data != null) Console.Out.WriteLine(data.Data);
+                    };
+                    setup.ErrorDataReceived += delegate(object sender, DataReceivedEventArgs data) {
+                        if (data.Data != null) Console.Error.WriteLine(data.Data);
+                    };
+                }
+                setup.Start();
+                if (options.Headless)
+                {
+                    setup.BeginOutputReadLine();
+                    setup.BeginErrorReadLine();
+                }
+                // The parameterless wait also drains both asynchronous output readers.
                 setup.WaitForExit();
                 return setup.ExitCode;
             }

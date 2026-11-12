@@ -20,12 +20,36 @@ if ($EnableUnsigned) { $installArguments += '--enable-unsigned' }
 
 if ($Headless) {
     try {
+        [Console]::OutputEncoding = New-Object Text.UTF8Encoding $false
+        $OutputEncoding = [Console]::OutputEncoding
         $python = Initialize-CapForgeRuntime $RuntimeRoot $manifest { param($message) Write-Host $message }
         if ($BootstrapOnly) { Write-Output $python; exit 0 }
         $arguments = ($installArguments + '--headless') | ForEach-Object { ConvertTo-CapForgeArgument $_ }
-        $setup = Start-Process -FilePath $python -ArgumentList ($arguments -join ' ') -NoNewWindow -Wait -PassThru
-        exit $setup.ExitCode
-    } catch { Write-Error $_; exit 1 }
+        $info = New-Object Diagnostics.ProcessStartInfo
+        $info.FileName = $python
+        $info.Arguments = $arguments -join ' '
+        $info.UseShellExecute = $false
+        $info.CreateNoWindow = $true
+        $info.RedirectStandardOutput = $true
+        $info.RedirectStandardError = $true
+        $info.StandardOutputEncoding = [Text.Encoding]::UTF8
+        $info.StandardErrorEncoding = [Text.Encoding]::UTF8
+        $info.EnvironmentVariables['PYTHONIOENCODING'] = 'utf-8'
+        $info.EnvironmentVariables['PYTHONUNBUFFERED'] = '1'
+        $setup = New-Object Diagnostics.Process
+        $setup.StartInfo = $info
+        try {
+            [void]$setup.Start()
+            # Drain both streams concurrently so a full error pipe cannot deadlock setup.
+            $stdout = $setup.StandardOutput.ReadToEndAsync()
+            $stderr = $setup.StandardError.ReadToEndAsync()
+            $setup.WaitForExit()
+            [Console]::Out.Write($stdout.Result)
+            [Console]::Error.Write($stderr.Result)
+            $exitCode = $setup.ExitCode
+        } finally { $setup.Dispose() }
+        exit $exitCode
+    } catch { Write-Error $_ -ErrorAction Continue; exit 1 }
 }
 
 # Native loading window works before Python exists. Download work stays off the UI thread.

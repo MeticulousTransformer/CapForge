@@ -93,6 +93,9 @@ class WindowsLauncherTests(unittest.TestCase):
         cls.root = Path(cls.temporary.name)
         cls.archive = cls.root / "test-source.zip"
         bootstrap = '''param([switch]$Headless,[string]$RuntimeRoot,[string]$ExtensionRoot,[switch]$EnableUnsigned)
+[Console]::OutputEncoding = New-Object Text.UTF8Encoding $false
+Write-Output ('bootstrap-output: ' + $RuntimeRoot)
+[Console]::Error.WriteLine('bootstrap-error: test failure')
 @{headless=$Headless.IsPresent; root=$RuntimeRoot; extensions=$ExtensionRoot; unsigned=$EnableUnsigned.IsPresent; source=$PSScriptRoot} |
     ConvertTo-Json | Set-Content -LiteralPath $RuntimeRoot -Encoding UTF8
 exit 23
@@ -110,8 +113,12 @@ exit 23
         report = self.root / "installed result ქართული.json"
         extensions = str(self.root / "CEP $literal & ქართული") + "\\"
         result = subprocess.run([str(self.executable), "--headless", "--target", str(report),
-                                 "--extension-root", extensions, "--enable-unsigned"], timeout=45)
+                                 "--extension-root", extensions, "--enable-unsigned"],
+                                capture_output=True, text=True, encoding="utf-8", timeout=45)
         self.assertEqual(result.returncode, 23)
+        self.assertIn("bootstrap-output:", result.stdout)
+        self.assertIn(report.name, result.stdout)
+        self.assertIn("bootstrap-error: test failure", result.stderr)
         captured = json.loads(report.read_text(encoding="utf-8-sig"))
         self.assertTrue(captured["headless"])
         self.assertTrue(captured["unsigned"])
