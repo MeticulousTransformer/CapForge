@@ -120,6 +120,17 @@ function makeLayer(index, options, text) {
         applied: null,
         setValue(doc) { sourceText.applied = doc; }
     };
+    // AE rejects fractional tracking at assignment, even when a fitting
+    // calculation legitimately produced a fractional estimate.
+    let tracking = 0;
+    Object.defineProperty(sourceText.value, "tracking", {
+        enumerable: true,
+        get() { return tracking; },
+        set(value) {
+            if (!Number.isInteger(value)) { throw new Error("Unable to set tracking: value is not an integer."); }
+            tracking = value;
+        }
+    });
     function prop(name) {
         if (!props[name]) { props[name] = makeProperty(name); }
         return props[name];
@@ -204,23 +215,35 @@ function makePrecomp(options) {
     const rf = opts.rectFor || rectFor;
     const created = [];
     const shapes = [];
+    const layerStack = []; // AE index order: new layers start at the top.
     const comp = {
         width: opts.width || 1080,
         height: opts.height || 1920,
         motionBlur: false,
         created,
         shapes,
+        layerStack,
         layers: {
             addText(source) {
                 const layer = makeLayer(created.length, {
                     rectFor: rf, comp, noEffects: opts.noEffects
                 }, source);
                 created.push(layer);
+                layerStack.unshift(layer);
                 return layer;
             },
             addShape() {
                 const shape = makeShape();
+                shape.moveAfter = function (other) {
+                    layerStack.splice(layerStack.indexOf(shape), 1);
+                    layerStack.splice(layerStack.indexOf(other) + 1, 0, shape);
+                };
+                shape.moveToEnd = function () {
+                    layerStack.splice(layerStack.indexOf(shape), 1);
+                    layerStack.push(shape);
+                };
                 shapes.push(shape);
+                layerStack.unshift(shape);
                 return shape;
             }
         }

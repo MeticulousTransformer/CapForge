@@ -29,7 +29,7 @@
             var last = -1;
             caption.wordIds.forEach(function (id) {
                 var word = byId[id];
-                if (!word || used[id] || word.start < last || word.start < caption.start - 0.001 || word.end > caption.end + 0.001) { throw new Error("Caption word references must be unique, ordered and inside the caption timing."); }
+                if (!Number.isInteger(id) || id < 0 || !word || used[id] || word.start < last || word.start < caption.start - 0.001 || word.end > caption.end + 0.001) { throw new Error("Caption word references must be unique, ordered and inside the caption timing."); }
                 used[id] = true;
                 last = word.start;
             });

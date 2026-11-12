@@ -155,3 +155,27 @@ test("media selection displays encoded punctuation and Georgian names exactly", 
     assert.equal(selected.ok, true, selected.error);
     assert.deepEqual(selected.data, chosen.data);
 });
+
+test("the host rejects coerced timestamps and malformed word content before generation", () => {
+    const context = host();
+    assert.equal(JSON.parse(context.KCF_initialize(path.join(repo, "panel"))).ok, true);
+    let generated = 0;
+    context.KCF_engine.generate = () => { generated++; return "unexpected"; };
+    const invalidEdits = [
+        doc => { doc.words[0].start = "0.2"; },
+        doc => { doc.words[0].end = true; },
+        doc => { doc.words[0].start = null; doc.captions[0].start = 0; },
+        doc => { doc.captions[0].start = "0.2"; },
+        doc => { doc.captions[0].end = true; },
+        doc => { doc.words[0].text = "\n"; },
+        doc => { doc.words[0].punctuationAfter = { wrong: "type" }; },
+        doc => { doc.captions[0].wordIds = ["0"]; }
+    ];
+    for (const change of invalidEdits) {
+        const edited = JSON.parse(JSON.stringify(document));
+        change(edited);
+        const response = dispatch(context, "generate", { document: edited, settings: SETTINGS });
+        assert.equal(response.ok, false, "invalid host payload must not generate: " + JSON.stringify(edited));
+    }
+    assert.equal(generated, 0);
+});

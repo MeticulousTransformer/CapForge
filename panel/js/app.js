@@ -183,7 +183,7 @@
             readiness();
         });
     }
-    function connect() {
+    function connect(quiet) {
         if (!bridge.available) { $("service-status").textContent = "Open in After Effects to connect"; $("ffmpeg-status").textContent = "Not needed for the demo"; status("Browser demonstration mode"); readiness(); return Promise.resolve(); }
         return context().then(function () { return bridge.call("token"); }).then(function (token) {
             api.setToken(token); return api.request("/health");
@@ -196,16 +196,25 @@
             result.providers.forEach(function (provider) { var option = document.createElement("option"); option.value = provider.id; option.textContent = provider.label + (provider.available ? " · ready" : " · setup needed"); $("provider").appendChild(option); });
             if (state.providers.some(function (p) { return p.id === value; })) { $("provider").value = value; }
             setDot("service-dot", true); setDot("connection-dot", true); setDot("ffmpeg-dot", state.ffmpeg);
-            $("service-status").textContent = "Connected · running on this computer"; $("ffmpeg-status").textContent = state.ffmpeg ? "ffmpeg is ready" : "ffmpeg missing · see installer help";
+            $("service-status").textContent = "Connected · running on this computer"; $("ffmpeg-status").textContent = state.ffmpeg ? "Ready to prepare your audio" : "Audio support missing · run the installer to repair";
             updateProvider(); status("Studio connected");
         }).catch(function (error) {
             state.connected = false; state.ffmpeg = false; ["service-dot", "connection-dot", "ffmpeg-dot"].forEach(function (id) { setDot(id, false); });
             $("service-status").textContent = "Offline · start the service below"; $("ffmpeg-status").textContent = "Waiting for service"; status("Preview ready · service offline"); readiness();
             updateGuideStatus();
-            if (error.message.indexOf("offline") < 0) {
+            if (!quiet && error.message.indexOf("offline") < 0) {
                 if (error.message.indexOf("engine") >= 0 || error.message.indexOf("bridge") >= 0) { $("host-status").textContent = "Caption engine needs attention · see message"; }
                 notice(error.message);
             }
+            return error;
+        });
+    }
+    function waitForService(attempts) {
+        return connect(true).then(function (error) {
+            if (state.connected) { status("Studio connected · ready to transcribe"); return; }
+            if (attempts <= 1) { throw new Error((error ? error.message + " " : "") + "The local service did not become ready. Check its startup window for an error, then retry. If it keeps failing, close After Effects and run the CapForge installer to repair Setup."); }
+            status("Waiting for the local service…");
+            return new Promise(function (resolve) { setTimeout(resolve, 1000); }).then(function () { return waitForService(attempts - 1); });
         });
     }
     function exportFile(name, data, kind) {
@@ -276,7 +285,7 @@
     function choose(action) { operation("Choosing media…", function () { return bridge.call(action).then(function (media) { if (media) { selectMedia(media); status("Media selected"); } else { status("Ready"); } }); }); }
     $("media-path").addEventListener("change", function () { var path = this.value.trim(); selectMedia(path ? {path: path, name: path.split(/[\\/]/).pop()} : null); });
     $("language").addEventListener("change", function () { persist(); updateProvider(); if (state.doc.provider === "demo") { setDocument(transcript.demo(this.value), "Built-in sample. Import JSON or transcribe your own clip."); } });
-    $("provider").addEventListener("change", updateProvider);
+    $("provider").addEventListener("change", function () { $("model").value = ""; updateProvider(); });
     $("transcribe").addEventListener("click", function () { operation("Transcribing your clip…", function () {
         var options = {keyterms: $("keyterms").value.split(",").map(function (word) { return word.trim(); }).filter(Boolean), diarize: $("diarize").checked};
         if ($("model").value.trim()) { options.model = $("model").value.trim(); }
@@ -300,7 +309,7 @@
     $("start-service").addEventListener("click", function () { operation("Checking local service…", function () {
         return connect().then(function () {
             if (state.connected) { status("Service is already running · ready to transcribe"); return; }
-            return bridge.call("startService").then(function () { status("Service is starting · check connection in a moment"); });
+            return bridge.call("startService").then(function () { return waitForService(10); });
         });
     }); });
     $("key-provider").addEventListener("change", renderProviderGuide);

@@ -89,9 +89,8 @@ class TestInstaller(unittest.TestCase):
                 migrated = managed_setup and not private_environment
                 self.assertEqual(interpreter.read_text(), "managed environment" if migrated else "earlier environment")
                 saved = list((root / "backups").glob("*/environment/user-package.txt"))
-                self.assertEqual(len(saved), 1 if migrated else 0)
-                if migrated:
-                    self.assertEqual(saved[0].read_text(), "preserve")
+                self.assertEqual(len(saved), 1)
+                self.assertEqual(saved[0].read_text(), "preserve")
 
     def test_private_python_probe_preserves_georgian_paths_with_cp1252_stdout(self):
         real_python, real_run = sys.executable, subprocess.run
@@ -121,7 +120,9 @@ class TestInstaller(unittest.TestCase):
             self.assertEqual(len(probes), 1)
             self.assertEqual(probes[0].returncode, 0, probes[0].stderr)
             self.assertEqual(interpreter.read_text(), "healthy environment")
-            self.assertEqual(list((root / "backups").glob("*/environment")), [])
+            saved = list((root / "backups").glob("*/environment"))
+            self.assertEqual(len(saved), 1)
+            self.assertEqual((saved[0] / interpreter.relative_to(root / ".venv")).read_text(), "healthy environment")
 
     def test_malformed_python_probe_is_repaired(self):
         for output in ("not JSON", "null", "{}"):
@@ -258,6 +259,34 @@ class TestInstaller(unittest.TestCase):
             self.assertEqual((root/"ae/KartuliCaptionForge.jsx").read_bytes(),original)
             self.assertIn("preserve", (root/"backend/.env").read_text())
             self.assertTrue((extensions/EXTENSION_ID/"CSXS/manifest.xml").exists())
+
+    def test_failed_update_restores_packages_in_a_healthy_environment(self):
+        for failure in ("pip", "panel"):
+            with self.subTest(failure=failure), tempfile.TemporaryDirectory() as folder:
+                base = Path(folder).resolve()
+                root, extensions = base / "runtime", base / "extensions"
+                install(root, extensions, dependencies=False, progress=lambda _: None)
+                interpreter = root / ".venv" / ("Scripts/python.exe" if sys.platform == "win32" else "bin/python")
+                interpreter.parent.mkdir(parents=True)
+                interpreter.write_text("healthy environment")
+                package = root / ".venv/existing-package.py"
+                package.write_text("previous working package")
+                added = root / ".venv/new-package.py"
+                original_code = (root / "backend/app.py").read_bytes()
+                def run(arguments, **kwargs):
+                    if arguments[1:3] == ["-m", "pip"] and "install" in arguments:
+                        package.write_text("updated package")
+                        added.write_text("new dependency")
+                        if failure == "pip":
+                            return subprocess.CompletedProcess(arguments, 1, "", "injected package failure")
+                    output = json.dumps(sys.executable) if "sys._base_executable" in arguments[-1] else ""
+                    return subprocess.CompletedProcess(arguments, 0, output, "")
+                with patch("deployment.subprocess.run", side_effect=run), patch("deployment.enable_unsigned", side_effect=RuntimeError("injected panel failure")):
+                    with self.assertRaises(RuntimeError):
+                        install(root, extensions, unsigned=True, progress=lambda _: None)
+                self.assertEqual(package.read_text(), "previous working package")
+                self.assertFalse(added.exists())
+                self.assertEqual((root / "backend/app.py").read_bytes(), original_code)
 
     def test_rename_updates_owned_legacy_install_without_losing_user_data(self):
         from environment import data_root

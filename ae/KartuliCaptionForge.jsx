@@ -560,7 +560,7 @@ KCF_loadTitles(new Folder(new File($.fileName).parent.fsName + "/titles"));
                 fontSize: parseFloat(etFontSize.text) || 72,
                 tracking: parseFloat(etTracking.text) || 0,
                 lineHeight: parseFloat(etLineHeight.text) || 0,
-                wordSpacing: parseFloat(etWordSpacing.text) || 24,
+                wordSpacing: num(etWordSpacing.text, 24),
                 wordsPerLine: parseInt(etWordsPerLine.text, 10) || 0,
                 minWordsPerLine: Math.max(1, parseInt(etMinWordsPerLine.text, 10) || 2),
                 charsPerLine: parseInt(etCharsPerLine.text, 10) || 0,
@@ -597,10 +597,10 @@ KCF_loadTitles(new Folder(new File($.fileName).parent.fsName + "/titles"));
                 fitWidth: num(etFitWidth.text, 0),
                 fitMaxFontSize: num(etFitMax.text, 260),
                 fitMaxTracking: num(etFitTracking.text, 120),
-                x: parseFloat(etX.text) || 960,
-                y: parseFloat(etY.text) || 1600,
+                x: num(etX.text, 960),
+                y: num(etY.text, 1600),
                 verticalOffset: parseFloat(etVOffset.text) || 0,
-                safeMargin: parseFloat(etSafe.text) || 160,
+                safeMargin: num(etSafe.text, 160),
                 slideAngle: slideDial.value(),
                 slideDistance: parseFloat(etSlideDistance.text) || 0,
                 slideDuration: parseFloat(etSlideDuration.text) || 0.35,
@@ -856,7 +856,8 @@ KCF_loadTitles(new Folder(new File($.fileName).parent.fsName + "/titles"));
         };
 
         btnClear.onClick = function () {
-            if (!confirm("Delete ALL generated KCF_Captions_* precomps from this project?")) {
+            if (!confirm("Delete all CapForge-owned caption precomps from this project? " +
+                    "Older unmarked precomps will be kept.")) {
                 return;
             }
             var n = KCF_clearGenerated();

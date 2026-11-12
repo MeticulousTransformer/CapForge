@@ -193,15 +193,19 @@ function KCF_fitLinesToWidth(layers, rects, wordStyles, words, lines, settings, 
     }
 }
 
-/* Tallest rect on a line, and its highest top (top is negative). */
+/* Full glyph bounds relative to the baseline. A tall ascender and a deep
+   descender can belong to different words, so max(height) is not enough. */
 function KCF_lineExtent(rects, line) {
-    var height = 0, top = 0;
+    var top = null, bottom = null;
     for (var i = 0; i < line.length; i++) {
         var rect = rects[line[i]];
-        if (rect.height > height) { height = rect.height; }
-        if (rect.top < top) { top = rect.top; }
+        if (top === null || rect.top < top) { top = rect.top; }
+        if (bottom === null || rect.top + rect.height > bottom) {
+            bottom = rect.top + rect.height;
+        }
     }
-    return { height: height, top: top };
+    if (top === null) { top = 0; bottom = 0; }
+    return { height: bottom - top, top: top, bottom: bottom };
 }
 
 /* Baseline-to-baseline offset of every line from the first.
@@ -217,8 +221,10 @@ function KCF_lineOffsets(rects, lines, settings, fitted) {
         return offsets;
     }
     for (l = 1; l < lines.length; l++) {
-        var step = (KCF_lineExtent(rects, lines[l - 1]).height +
-            KCF_lineExtent(rects, lines[l]).height) / 2 * 1.12;
+        var previous = KCF_lineExtent(rects, lines[l - 1]);
+        var next = KCF_lineExtent(rects, lines[l]);
+        var gap = (previous.height + next.height) / 2 * 0.12;
+        var step = previous.bottom - next.top + gap;
         offsets.push(offsets[l - 1] + step);
     }
     return offsets;
@@ -254,11 +260,14 @@ function KCF_buildCaption(precomp, doc, caption, ci, settings, pos, shuffler) {
     }
 
     // measured after any refit, since the sizes may have just changed
-    var maxH = 0, topMost = 0;
+    var topMost = null, bottomMost = null;
     for (var m = 0; m < rects.length; m++) {
-        if (rects[m].height > maxH) { maxH = rects[m].height; }
-        if (rects[m].top < topMost) { topMost = rects[m].top; }  // top is negative
+        if (topMost === null || rects[m].top < topMost) { topMost = rects[m].top; }
+        if (bottomMost === null || rects[m].top + rects[m].height > bottomMost) {
+            bottomMost = rects[m].top + rects[m].height;
+        }
     }
+    var maxH = bottomMost - topMost;
     var lineWidths = [];
     for (var li = 0; li < lines.length; li++) {
         var lw = 0;
@@ -293,7 +302,7 @@ function KCF_buildCaption(precomp, doc, caption, ci, settings, pos, shuffler) {
     var preset = KCF_PRESETS[settings.preset] || KCF_PRESETS.highlight_word;
     var perWord = (preset instanceof Function) ? preset : preset.perWord;
     var layouts = [];
-    var minX = null, maxX = null;
+    var minX = null, maxX = null, minY = null, maxY = null;
     for (var l = 0; l < lines.length; l++) {
         var anchorY = anchorYFor(l);
         var lineY = baseY + lineOffsets[l];
@@ -313,6 +322,10 @@ function KCF_buildCaption(precomp, doc, caption, ci, settings, pos, shuffler) {
                glyphs' left edge at the cursor and their baseline at lineY. */
             var anchor = [rects[idx].left + rects[idx].width / 2, anchorY];
             var basePos = [cursor + rects[idx].width / 2, lineY + anchorY];
+            var glyphTop = lineY + rects[idx].top;
+            var glyphBottom = glyphTop + rects[idx].height;
+            if (minY === null || glyphTop < minY) { minY = glyphTop; }
+            if (maxY === null || glyphBottom > maxY) { maxY = glyphBottom; }
             lyr.property("Transform").property("Anchor Point").setValue(anchor);
             lyr.property("Transform").property("Position").setValue(basePos);
             lyr.name = "KCF_C" + KCF_pad3(ci) + "_W" + KCF_pad3(idx) + "_" + w.text;
@@ -346,23 +359,21 @@ function KCF_buildCaption(precomp, doc, caption, ci, settings, pos, shuffler) {
     if (settings.backgroundBox) {
         var pad = Math.round(settings.fontSize * 0.35);
         var boxW = Math.ceil((maxX - minX) + pad * 2);
-        var boxH = Math.ceil(blockHeight + maxH + pad * 2);
-        // rects are baseline-relative: top is negative above the baseline
-        var top = rects[0] ? rects[0].top : -settings.fontSize;
+        var boxH = Math.ceil((maxY - minY) + pad * 2);
         var box = KCF_addRoundRect(
             precomp, "KCF_C" + KCF_pad3(ci) + "_BOX",
             boxW, boxH, settings.boxColor, settings.boxRadius || 0,
             (minX + maxX) / 2,
-            baseY + top + (blockHeight + maxH) / 2);
+            (minY + maxY) / 2);
         box.inPoint = caption.start;
         box.outPoint = Math.max(caption.end, caption.start + 0.05);
         // Old looks keep their solid box. Explicit 0 is fully transparent.
         var boxOpacity = settings.boxOpacity;
         if (typeof boxOpacity !== "number" || !isFinite(boxOpacity)) { boxOpacity = 100; }
         KCF_prop(box, "Opacity").setValue(Math.max(0, Math.min(100, boxOpacity)));
-        // layers[0] was created first, so it is the bottom-most text layer;
-        // placing the box after it puts the box below ALL caption text
-        box.moveAfter(layers[0]);
+        // The background must also sit behind preset extras such as the
+        // active-word boxes. This fresh precomp contains generated layers only.
+        box.moveToEnd();
     }
 }
 
@@ -384,14 +395,16 @@ function KCF_generate(doc, settings) {
     }
 
     app.beginUndoGroup("KCF Generate Captions");
+    var precomp = null;
     try {
         var folder = KCF_findOrCreateFolder(proj, KCF_FOLDER_NAME);
         var name = "KCF_Captions_" + KCF_timestamp();
         var duration = Math.max(activeComp.duration, (doc.duration || 0) + 1);
-        var precomp = proj.items.addComp(
+        precomp = proj.items.addComp(
             name, activeComp.width, activeComp.height,
             activeComp.pixelAspect, duration, activeComp.frameRate);
         precomp.parentFolder = folder;
+        precomp.comment = JSON.stringify({ tool: "CapForge", kind: "caption-precomp" });
 
         var pos = KCF_anchorPosition(settings, precomp);
         var shuffler = KCF_shufflerFor(settings);
@@ -404,12 +417,27 @@ function KCF_generate(doc, settings) {
         compLayer.name = name;
         compLayer.moveToBeginning();
         return name;
+    } catch (error) {
+        // This object was created by this call; existing project items are
+        // never rolled back or removed when a font/effect/preset fails.
+        if (precomp) { try { precomp.remove(); } catch (cleanupError) {} }
+        throw error;
     } finally {
         app.endUndoGroup();
     }
 }
 
-/* Remove generated caption precomps (asks per item is handled by caller). */
+/* A name is not proof of ownership: an editor may use the same prefix.
+   Older unmarked outputs are left for the editor to remove manually. */
+function KCF_isGeneratedPrecomp(item) {
+    if (!(item instanceof CompItem) || !item.comment) { return false; }
+    try {
+        var metadata = JSON.parse(item.comment);
+        return metadata && metadata.tool === "CapForge" && metadata.kind === "caption-precomp";
+    } catch (error) { return false; }
+}
+
+/* Remove only marked generated caption precomps; caller confirms first. */
 function KCF_clearGenerated() {
     var proj = app.project;
     if (!proj) { return 0; }
@@ -419,7 +447,7 @@ function KCF_clearGenerated() {
         var doomed = [];
         for (var i = 1; i <= proj.numItems; i++) {
             var item = proj.item(i);
-            if (item instanceof CompItem && item.name.indexOf("KCF_Captions_") === 0) {
+            if (KCF_isGeneratedPrecomp(item)) {
                 doomed.push(item);
             }
         }

@@ -9,7 +9,7 @@ import time
 
 import requests
 
-from providers.base import ASRProvider, ProviderError, ProviderResult, lang_short
+from providers.base import ASRProvider, ProviderError, ProviderResult, http_error, lang_short
 from services.normalize import words_from_simple
 
 BASE = "https://api.assemblyai.com/v2"
@@ -31,7 +31,7 @@ class AssemblyAIProvider(ASRProvider):
         with open(audio_path, "rb") as f:
             up = requests.post(f"{BASE}/upload", headers=headers, data=f, timeout=900)
         if not up.ok:
-            raise ProviderError(f"AssemblyAI upload error {up.status_code}: {up.text[:500]}")
+            raise http_error(self.label, up.status_code)
         upload_url = up.json().get("upload_url")
 
         lang = lang_short(language)
@@ -45,7 +45,7 @@ class AssemblyAIProvider(ASRProvider):
 
         job = requests.post(f"{BASE}/transcript", headers=headers, json=payload, timeout=60)
         if not job.ok:
-            raise ProviderError(f"AssemblyAI job error {job.status_code}: {job.text[:500]}")
+            raise http_error(self.label, job.status_code)
         tid = job.json().get("id")
 
         deadline = time.time() + POLL_TIMEOUT
@@ -53,7 +53,7 @@ class AssemblyAIProvider(ASRProvider):
         while time.time() < deadline:
             poll = requests.get(f"{BASE}/transcript/{tid}", headers=headers, timeout=60)
             if not poll.ok:
-                raise ProviderError(f"AssemblyAI poll error {poll.status_code}: {poll.text[:500]}")
+                raise http_error(self.label, poll.status_code)
             raw = poll.json()
             status = raw.get("status")
             if status == "completed":
@@ -64,7 +64,7 @@ class AssemblyAIProvider(ASRProvider):
         else:
             raise ProviderError("AssemblyAI transcription timed out.")
 
-        words = words_from_simple(raw.get("words", []), time_scale=0.001)
+        words = words_from_simple(raw.get("words", []), time_scale=0.001, raw_response=raw)
         if not words:
             raise ProviderError("AssemblyAI returned no words.")
         duration = raw.get("audio_duration")

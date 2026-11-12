@@ -134,14 +134,18 @@ def install(target: Path | None = None, extensions: Path | None = None, *, depen
                         healthy = _uses_private_python(base_python, private_runtime)
                 except (OSError, ValueError, subprocess.TimeoutExpired):
                     healthy = False
-                if not healthy:
-                    # Keep the earlier environment recoverable during repair
-                    # or migration to the private runtime.
+                # pip can replace packages before an install fails. Keep a
+                # complete earlier environment so rollback restores packages
+                # together with the code that used them.
+                backup = _inside(backups / "environment", root)
+                backup.parent.mkdir(parents=True, exist_ok=True)
+                if healthy:
+                    progress("Backing up the transcription service…")
+                    shutil.copytree(environment, backup, symlinks=True)
+                else:
                     progress("Repairing the transcription service…")
-                    backup = _inside(backups / "environment", root)
-                    backup.parent.mkdir(parents=True, exist_ok=True)
                     shutil.move(str(environment), str(backup))
-                    replaced.append((environment, backup))
+                replaced.append((environment, backup))
             if not python.exists():
                 subprocess.run([sys.executable, "-m", "venv", str(environment)], check=True, capture_output=True, text=True)
             progress("Installing the transcription service (internet required)…")

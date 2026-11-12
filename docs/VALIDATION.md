@@ -1,3 +1,5 @@
+> For the subsequent fresh review and local fixes, see [12 November review](REVIEW_2026-11-12.md). Counts and limitations below describe earlier snapshots.
+
 # v0.3.2 validation — 12 November 2026
 
 - **241 automated tests passed:** 82 backend, 31 installer, 11 release/package,

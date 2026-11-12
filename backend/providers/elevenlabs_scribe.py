@@ -6,7 +6,7 @@ import os
 
 import requests
 
-from providers.base import ASRProvider, ProviderError, ProviderResult, lang_short
+from providers.base import ASRProvider, ProviderError, ProviderResult, http_error, lang_short
 from services.normalize import normalize_elevenlabs
 
 API_URL = "https://api.elevenlabs.io/v1/speech-to-text"
@@ -46,15 +46,10 @@ class ElevenLabsScribeProvider(ASRProvider):
             data["keyterms"] = json.dumps(list(keyterms), ensure_ascii=False)
 
         resp = self._request(api_key, audio_path, data)
-        if not resp.ok and keyterms:
-            # keyterm prompting may be unsupported on some plans/models
-            data.pop("keyterms", None)
-            resp = self._request(api_key, audio_path, data)
-        if not resp.ok and model == "scribe_v2":
-            data["model_id"] = "scribe_v1"
-            resp = self._request(api_key, audio_path, data)
+        # One click makes one upload. A failed request does not authorize a
+        # second paid attempt or a silent change to the selected model.
         if not resp.ok:
-            raise ProviderError(f"ElevenLabs error {resp.status_code}: {resp.text[:500]}")
+            raise http_error(self.label, resp.status_code)
 
         raw = resp.json()
         words = normalize_elevenlabs(raw)

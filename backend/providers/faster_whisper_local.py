@@ -63,7 +63,7 @@ class FasterWhisperProvider(ASRProvider):
             "duration": getattr(info, "duration", None),
             "segments": raw_segments, "words": raw_words,
         }
-        words = words_from_simple(raw_words)
+        words = words_from_simple(raw_words, raw_response=raw)
         if not words:
             raise ProviderError("faster-whisper produced no words. Check audio.")
         return ProviderResult(

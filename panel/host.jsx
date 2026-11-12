@@ -66,22 +66,27 @@ function KCF_hostFonts() {
     return found;
 }
 function KCF_hostValidate(doc, settings) {
-    if (!doc || !doc.words || !doc.captions || !doc.words.length || !doc.captions.length || doc.words.length > 20000) { throw new Error("A valid word-timed transcript is required."); }
-    if (!settings || !KCF_engine.presets[settings.preset] || !(settings.fontSize >= 8 && settings.fontSize <= 600)) { throw new Error("Choose a registered style and a valid font size."); }
-    var seen = {}, used = {}, previous = -1;
+    function number(value) { return typeof value === "number" && isFinite(value); }
+    function integer(value) { return number(value) && value >= 0 && value % 1 === 0; }
+    function array(value) { return Object.prototype.toString.call(value) === "[object Array]"; }
+    if (!doc || !array(doc.words) || !array(doc.captions) || !doc.words.length || !doc.captions.length || doc.words.length > 20000 || doc.captions.length > 10000) { throw new Error("A valid word-timed transcript is required."); }
+    if (!settings || !KCF_engine.presets.hasOwnProperty(settings.preset) || !number(settings.fontSize) || !(settings.fontSize >= 8 && settings.fontSize <= 600)) { throw new Error("Choose a registered style and a valid font size."); }
+    var seen = {}, used = {}, captionIds = {}, previous = -1;
     for (var i = 0; i < doc.words.length; i++) {
         var w = doc.words[i];
-        if (typeof w.id !== "number" || w.id < 0 || w.id % 1 || seen[w.id] || typeof w.text !== "string" || !w.text.length || w.text.length > 200 || !(isFinite(w.start) && isFinite(w.end) && w.start >= 0 && w.end > w.start && w.start >= previous)) { throw new Error("Invalid word or timing in transcript."); }
+        if (!w || !integer(w.id) || seen[w.id] || typeof w.text !== "string" || !/\S/.test(w.text) || /[\r\n]/.test(w.text) || w.text.length > 200 || !(number(w.start) && number(w.end) && w.start >= 0 && w.end > w.start && w.start >= previous)) { throw new Error("Invalid word or timing in transcript."); }
+        if (w.punctuationAfter !== undefined && (typeof w.punctuationAfter !== "string" || w.punctuationAfter.length > 16 || /[\r\n]/.test(w.punctuationAfter))) { throw new Error("Word punctuation must be a short string without line breaks."); }
         seen[w.id] = w; previous = w.start;
     }
     previous = -1;
     for (var ci = 0; ci < doc.captions.length; ci++) {
         var c = doc.captions[ci], last = -1;
-        if (!(c.start >= 0 && c.end > c.start && c.start >= previous) || !c.wordIds || !c.wordIds.length || c.wordIds.length > 100) { throw new Error("Invalid caption interval."); }
+        if (!c || !integer(c.id) || captionIds[c.id] || !(number(c.start) && number(c.end) && c.start >= 0 && c.end > c.start && c.start >= previous) || !array(c.wordIds) || !c.wordIds.length || c.wordIds.length > 100) { throw new Error("Invalid caption interval."); }
+        captionIds[c.id] = true;
         previous = c.end;
         for (var wi = 0; wi < c.wordIds.length; wi++) {
             var word = seen[c.wordIds[wi]];
-            if (!word || used[word.id] || word.start < last || word.start < c.start - 0.001 || word.end > c.end + 0.001) { throw new Error("Invalid caption word reference."); }
+            if (!integer(c.wordIds[wi]) || !word || used[word.id] || word.start < last || word.start < c.start - 0.001 || word.end > c.end + 0.001) { throw new Error("Invalid caption word reference."); }
             used[word.id] = true; last = word.start;
         }
     }

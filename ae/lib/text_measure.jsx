@@ -35,7 +35,9 @@ function KCF_styleTextLayer(textLayer, style) {
     doc.resetCharStyle();
     if (style.font) { doc.font = style.font; }
     doc.fontSize = style.fontSize;
-    doc.tracking = style.tracking;
+    // The boundary fitter works with fractional estimates; AE's tracking
+    // property accepts integers only. Keep that conversion at the AE boundary.
+    doc.tracking = Math.round(style.tracking || 0);
     if (style.lineHeight && style.lineHeight > 0) {
         doc.autoLeading = false;
         doc.leading = style.lineHeight;

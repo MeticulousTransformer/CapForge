@@ -45,6 +45,17 @@ test("generated text ignores inherited AE caps and character scaling", () => {
     assert.equal(applied.fontSize, 72);
 });
 
+test("fractional tracking is rounded only when assigning the AE text property", () => {
+    for (const [requested, expected] of [[27.0171171834326, 27], [-12.75, -13]]) {
+        const context = loadLib();
+        const layer = makeTextLayer();
+        const settings = Object.assign({}, BASE, { tracking: requested });
+        context.KCF_styleTextLayer(layer, settings);
+        assert.equal(layer.textDocument.tracking, expected);
+        assert.equal(settings.tracking, requested, "the supplied style must stay unchanged");
+    }
+});
+
 // --- fill and stroke --------------------------------------------------
 
 test("text is filled by default", () => {

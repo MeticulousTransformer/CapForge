@@ -10,7 +10,7 @@ import os
 
 import requests
 
-from providers.base import ASRProvider, ProviderError, ProviderResult, lang_short
+from providers.base import ASRProvider, ProviderError, ProviderResult, http_error, lang_short
 from services.audio_extract import wav_duration
 from services.normalize import estimate_words_from_text, normalize_openai_verbose
 
@@ -48,7 +48,7 @@ class OpenAIASRProvider(ASRProvider):
                 timeout=900,
             )
         if not resp.ok:
-            raise ProviderError(f"OpenAI error {resp.status_code}: {resp.text[:500]}")
+            raise http_error(self.label, resp.status_code)
         raw = resp.json()
 
         if raw.get("words"):

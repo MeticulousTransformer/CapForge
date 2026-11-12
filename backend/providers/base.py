@@ -12,6 +12,21 @@ class ProviderError(RuntimeError):
     """User-facing provider failure (missing key, API error...)."""
 
 
+def http_error(label: str, status: int) -> ProviderError:
+    """Translate a failed provider request without echoing its private body."""
+    if status in (401, 403):
+        action = "Check the saved API key in Setup and confirm that your provider account allows transcription."
+    elif status == 429:
+        action = "Check your provider's credits or usage limit, then try again later."
+    elif status == 413:
+        action = "Export a shorter audio clip and try that file."
+    elif status >= 500:
+        action = "The provider is having trouble. Check its status and try again later."
+    else:
+        action = "Check the chosen model, language and transcription options, then try again."
+    return ProviderError(f"{label} could not accept the request (HTTP {status}). {action}")
+
+
 @dataclass
 class ProviderResult:
     raw: object                      # raw provider JSON, saved for debugging

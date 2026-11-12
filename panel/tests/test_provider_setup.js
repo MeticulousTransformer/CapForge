@@ -53,7 +53,7 @@ test('demo account links isolate the new tab; missing CEP opener reports useful 
     assert.throws(() => links({cep: {util: {openURLInDefaultBrowser: () => ({err: 1})}}}).open(guides.urls[0]), /could not open/);
 });
 
-test('setup flow clears switched keys, handles Azure region and selects the saved AI', async () => {
+async function studio(options = {}) {
     // Minimal DOM model: tests behavior only, without launching or rendering a browser.
     const elements = new Map();
     function element(id = '') {
@@ -81,10 +81,13 @@ test('setup flow clears switched keys, handles Azure region and selects the save
         KCF_Transcript: require('../js/transcript'), KCF_ProviderGuide: guides,
         KCF_DesignControls: {mountDial: () => ({sync() {}}), fontGroups: () => ({})},
         KCF_Preview: {create: () => ({set() {}, context() {}, pause() {}, destroy() {}})},
-        KCF_Bridge: {available: true, call: async action => action === 'context' ? {comp: null, fonts: []} : 'test-token'},
+        KCF_Bridge: {available: true, call: async action => {
+            if (options.host) await options.host(action);
+            return action === 'context' ? {comp: null, fonts: []} : 'test-token';
+        }},
         KCF_API: {setToken() {}, request: async (route, payload) => {
             calls.push({route, payload});
-            if (route === '/health') return {ffmpeg: true};
+            if (route === '/health') {if (options.health) await options.health(); return {ffmpeg: true};}
             if (route === '/providers') return {providers: providers()};
             if (route === '/settings/provider-key') {configured.add(guides.get(payload.name).id); return {ok: true};}
         }}
@@ -93,10 +96,15 @@ test('setup flow clears switched keys, handles Azure region and selects the save
         querySelector: () => element(), querySelectorAll: selector => selector === '.tab-pane' ? panes : []};
     vm.runInNewContext(fs.readFileSync(path.join(root, 'panel/js/updates.js'), 'utf8'), {window});
     vm.runInNewContext(fs.readFileSync(path.join(root, 'panel/js/app.js'), 'utf8'), {
-        window, document, localStorage: {getItem: key => storage.get(key) || null, setItem: (key, value) => storage.set(key, value)}
+        window, document, setTimeout: fn => {Promise.resolve().then(fn);}, localStorage: {getItem: key => storage.get(key) || null, setItem: (key, value) => storage.set(key, value)}
     });
-    const settle = async () => {for (let i = 0; i < 20; i++) await Promise.resolve();};
+    const settle = async () => {for (let i = 0; i < 300; i++) await Promise.resolve();};
     await settle();
+    return {$, windowEvents, calls, storage, settle};
+}
+
+test('setup flow clears switched keys, handles Azure region and selects the saved AI', async () => {
+    const {$, windowEvents, calls, storage, settle} = await studio();
     assert.equal($('save-key').disabled, false);
     $('api-key').value = 'old-provider-secret';
     $('key-provider').value = 'AZURE_SPEECH_KEY'; $('key-provider').events.change.call($('key-provider'));
@@ -116,4 +124,44 @@ test('setup flow clears switched keys, handles Azure region and selects the save
     assert.equal($('provider-key-fields').hidden, true);
     assert.equal($('azure-region-field').hidden, true);
     assert.ok($('provider-setup-status').textContent.includes('additional setup'));
+});
+
+
+test('changing provider clears an incompatible custom model; reconnect preserves it', async () => {
+    const {$, settle} = await studio();
+    $('model').value = 'scribe_v2';
+    $('provider').value = 'openai'; $('provider').events.change();
+    assert.equal($('model').value, '');
+    $('model').value = 'whisper-1';
+    $('reconnect').events.click(); await settle();
+    assert.equal($('model').value, 'whisper-1');
+});
+
+test('starting the service waits for readiness without another user click', async () => {
+    let started = false, checks = 0, launches = 0;
+    const {$, settle} = await studio({
+        host: action => {if (action === 'startService') {started = true; launches++;}},
+        health: () => {if (!started || ++checks < 3) throw new Error('Local service is offline.');}
+    });
+    assert.equal($('save-key').disabled, true);
+    $('start-service').events.click(); await settle();
+    assert.equal(launches, 1);
+    assert.equal($('save-key').disabled, false);
+    assert.match($('service-status').textContent, /Connected/);
+    $('start-service').events.click(); await settle();
+    assert.equal(launches, 1, 'do not launch a second connected service');
+});
+
+test('a service that never starts unlocks controls and explains recovery', async () => {
+    const {$, settle} = await studio({health: () => {throw new Error('Local service is offline.');}});
+    $('start-service').events.click(); await settle();
+    assert.equal($('start-service').disabled, false);
+    assert.equal($('save-key').disabled, true);
+    assert.match($('notice-text').textContent, /Setup|installer/);
+});
+
+test('failed startup retains the actionable connection error', async () => {
+    const {$, settle} = await studio({health: () => {throw new Error('An older CapForge service is running. Restart this computer.');}});
+    $('start-service').events.click(); await settle();
+    assert.match($('notice-text').textContent, /Restart this computer/);
 });

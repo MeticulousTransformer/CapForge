@@ -11,7 +11,7 @@
    label this menu **Extensions (Legacy)**).
 4. Play the built-in preview and choose a style. Open **Design** to change the
    font, colors, layout or animation controls. Use a Georgian-supporting font.
-5. In **Setup**, start the local service, then **Check connection**. Select a
+5. In **Setup**, click **Start service** and wait for **Studio connected**. Connection checks happen automatically. Use **Check connection** to refresh after other setup changes. Select a
    service and follow its three-step guide. Open its account page, paste your own
    key and choose **Save key & use this AI**. Start with ElevenLabs for Georgian.
    See [AI setup](AI_SETUP.md) for account links and optional Google/local setup.
@@ -65,8 +65,8 @@ The canvas approximates typography and motion; motion blur renders in AE.
 speaker identification, caption minimums/durations and a manual media location.
 Prepare audio only saves a WAV without sending it to a transcription provider.
 
-**No connection:** Start the local service and wait for its ready message, then
-check the connection. If another copy of the service uses port 8765, close that
+**No connection:** Click **Start service** and wait for CapForge to connect.
+If it cannot connect, it shows the error and lets you retry. If another copy of the service uses port 8765, close that
 copy before starting the installed service. The installed panel uses its own token.
 
 **No panel in AE:** Restart AE after installation. Confirm the unsigned-build

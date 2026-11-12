@@ -7,6 +7,7 @@ must never care which provider produced it.
 from __future__ import annotations
 
 import uuid
+import math
 from dataclasses import dataclass, field, asdict
 from typing import List, Optional
 
@@ -51,14 +52,18 @@ def build_document(
     captions: List[Caption],
     doc_id: Optional[str] = None,
 ) -> dict:
-    if duration is None or duration <= 0:
-        duration = max((w.end for w in words), default=0.0)
+    if not isinstance(duration, (int, float)) or not math.isfinite(duration) or duration <= 0:
+        duration = 0.0
+    # Provider metadata can stop slightly before the final word. Keep the
+    # timeline intact, including sub-millisecond endpoints.
+    duration = max(duration, max((w.end for w in words), default=0.0),
+                   max((c.end for c in captions), default=0.0))
     return {
         "id": doc_id or str(uuid.uuid4()),
         "sourceMediaPath": source_media_path,
         "language": language,
         "provider": provider,
-        "duration": round(float(duration), 3),
+        "duration": float(duration),
         "words": [w.to_dict() for w in words],
         "captions": [c.to_dict() for c in captions],
     }

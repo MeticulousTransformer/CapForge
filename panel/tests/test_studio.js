@@ -199,3 +199,11 @@ test("shuffle preview uses the AE source and repeats fixed seeds exactly", () =>
     assert.equal(trait.font,"OtherFont"); assert.equal(trait.fill,false); assert.equal(trait.stroke,true);
     assert.equal(settings.forAE(look).shuffleSeed,123); assert.deepEqual(settings.forAE(look).shuffleFonts,look.shuffleFonts);
 });
+
+
+test("caption references reject coercible IDs before sending to AE", () => {
+    for (const id of ["0", false, null]) {
+        const doc = sample(); doc.captions[0].wordIds[0] = id;
+        assert.throws(() => transcript.validate(doc), /references/);
+    }
+});

@@ -44,11 +44,13 @@ from fastapi.exceptions import RequestValidationError
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 from starlette.responses import JSONResponse
 from pydantic import BaseModel, Field, model_validator
+from requests.exceptions import RequestException, Timeout
 
 from services.audio_extract import extract_audio, find_ffmpeg, wav_duration
 from services.grouping import GroupingOptions, group_words
 from services.local_scan import scan_local
 from services.models import Word, build_document
+from services.normalize import WordTimingError
 from services.studio_settings import local_token, save_provider_key
 from services.transcript_validation import validate_document
 from services.provider_registry import available_ids, get_provider, list_infos
@@ -134,6 +136,13 @@ _shutdown_server = None
 _service_stopping = False
 
 
+def _require_running():
+    # Recheck after acquiring the work lock: shutdown can begin after the
+    # middleware admitted a request but before its worker thread starts.
+    if _service_stopping:
+        raise HTTPException(status_code=503, detail="CapForge is stopping for an update. Start the service again after setup finishes.")
+
+
 def _run_exports() -> str:
     return os.path.join(EXPORTS_DIR, "runs", str(uuid.uuid4()))
 
@@ -194,6 +203,7 @@ def install_update():
     if not _transcription_lock.acquire(blocking=False):
         raise HTTPException(status_code=409, detail="Wait for the current transcription to finish before updating CapForge.")
     try:
+        _require_running()
         return updates.install(os.path.dirname(BACKEND_DIR), VERSION)
     except updates.UpdateError as error:
         raise HTTPException(status_code=error.status_code, detail=str(error))
@@ -203,11 +213,16 @@ def install_update():
 
 @app.post("/extract_audio")
 def extract(req: ExtractRequest):
+    if not _transcription_lock.acquire(blocking=False):
+        raise HTTPException(status_code=409, detail="Audio preparation or transcription is already running. Wait for it to finish.")
     try:
+        _require_running()
         wav = extract_audio(req.mediaPath, _run_exports())
         return {"audio": wav, "duration": wav_duration(wav)}
     except RuntimeError as e:
         raise HTTPException(status_code=400, detail=str(e))
+    finally:
+        _transcription_lock.release()
 
 
 @app.post("/transcribe")
@@ -215,6 +230,7 @@ def transcribe(req: TranscribeRequest):
     if not _transcription_lock.acquire(blocking=False):
         raise HTTPException(status_code=409, detail="A transcription is already running. Wait for it to finish.")
     try:
+        _require_running()
         return _transcribe(req)
     finally:
         _transcription_lock.release()
@@ -239,8 +255,18 @@ def _transcribe(req: TranscribeRequest):
 
     try:
         result = provider.transcribe(wav, req.language, req.providerOptions)
+    except WordTimingError as e:
+        detail = str(e)
+        if e.raw_response is not None:
+            _save_json(os.path.join(run_dir, f"raw_{provider.id}.json"), e.raw_response)
+            detail += " The raw response was saved for troubleshooting."
+        raise HTTPException(status_code=400, detail=detail) from None
     except ProviderError as e:
         raise HTTPException(status_code=400, detail=str(e))
+    except Timeout:
+        raise HTTPException(status_code=400, detail=f"{provider.label} timed out. Check the provider account before trying again; the upload may have reached it.") from None
+    except RequestException:
+        raise HTTPException(status_code=400, detail=f"Could not reach {provider.label}. Check your internet connection and try again.") from None
     except Exception:
         raise HTTPException(status_code=500, detail=f"{provider.id} could not complete transcription. Check its configuration and try again.")
 
@@ -260,6 +286,15 @@ def _transcribe(req: TranscribeRequest):
         words=result.words,
         captions=captions,
     )
+    try:
+        document = validate_document(document)
+    except ValueError as error:
+        raise HTTPException(
+            status_code=400,
+            detail=(f"{provider.label} returned a transcript with unusable word timing or caption data. "
+                    "Try another model or provider. The raw response was saved for troubleshooting. "
+                    f"Details: {error}"),
+        ) from None
     normalized_path = _save_json(os.path.join(run_dir, "normalized.json"), document)
 
     warnings = list(result.warnings)
@@ -299,6 +334,7 @@ def provider_key(req: ProviderKeyRequest):
     if not _transcription_lock.acquire(blocking=False):
         raise HTTPException(status_code=409, detail="Save provider keys after the current transcription finishes.")
     try:
+        _require_running()
         save_provider_key(BACKEND_DIR, req.name, req.value, req.region)
         return {"ok": True}
     except ValueError as error:

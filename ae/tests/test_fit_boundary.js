@@ -122,6 +122,24 @@ test("lines stack without overlapping once their sizes differ", () => {
         `for a ${secondHeight.toFixed(1)}px line`);
 });
 
+test("a large final one-word line stays below every glyph on the previous line", () => {
+    for (const count of [3, 5]) {
+        const { precomp } = build(count, FIT);
+        const lines = linesOf(precomp, 2).map(line => line.map(layer => {
+            const rect = layer.sourceRectAtTime(0, false);
+            const baseline = layer.transform("Position").value[1] -
+                layer.transform("Anchor Point").value[1];
+            return { top: baseline + rect.top, bottom: baseline + rect.top + rect.height };
+        }));
+        for (let i = 1; i < lines.length; i++) {
+            const previousBottom = Math.max(...lines[i - 1].map(rect => rect.bottom));
+            const nextTop = Math.min(...lines[i].map(rect => rect.top));
+            assert.ok(nextTop > previousBottom,
+                `line ${i} starts at ${nextTop}, above the previous bottom ${previousBottom}`);
+        }
+    }
+});
+
 test("a fitted line still centres on the anchor", () => {
     const { precomp, pos } = build(4, FIT);
     const line = linesOf(precomp, 2)[0];

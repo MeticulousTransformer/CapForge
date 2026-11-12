@@ -10,7 +10,7 @@ import time
 
 import requests
 
-from providers.base import ASRProvider, ProviderError, ProviderResult, lang_short
+from providers.base import ASRProvider, ProviderError, ProviderResult, http_error, lang_short
 from services.normalize import words_from_simple
 
 UPLOAD_URL = "https://api.gladia.io/v2/upload"
@@ -37,7 +37,7 @@ class GladiaProvider(ASRProvider):
                 timeout=900,
             )
         if not up.ok:
-            raise ProviderError(f"Gladia upload error {up.status_code}: {up.text[:500]}")
+            raise http_error(self.label, up.status_code)
         audio_url = up.json().get("audio_url")
 
         payload = {"audio_url": audio_url}
@@ -46,7 +46,7 @@ class GladiaProvider(ASRProvider):
             payload["language"] = lang
         job = requests.post(TRANSCRIBE_URL, headers=headers, json=payload, timeout=60)
         if not job.ok:
-            raise ProviderError(f"Gladia job error {job.status_code}: {job.text[:500]}")
+            raise http_error(self.label, job.status_code)
         result_url = job.json().get("result_url")
 
         deadline = time.time() + POLL_TIMEOUT
@@ -54,7 +54,7 @@ class GladiaProvider(ASRProvider):
         while time.time() < deadline:
             poll = requests.get(result_url, headers=headers, timeout=60)
             if not poll.ok:
-                raise ProviderError(f"Gladia poll error {poll.status_code}: {poll.text[:500]}")
+                raise http_error(self.label, poll.status_code)
             raw = poll.json()
             status = raw.get("status")
             if status == "done":
@@ -71,10 +71,10 @@ class GladiaProvider(ASRProvider):
             for w in utt.get("words", []):
                 raw_words.append({
                     "text": (w.get("word") or "").strip(),
-                    "start": w.get("start", 0.0), "end": w.get("end", 0.0),
+                    "start": w.get("start"), "end": w.get("end"),
                     "confidence": w.get("confidence", 1.0),
                 })
-        words = words_from_simple(raw_words)
+        words = words_from_simple(raw_words, raw_response=raw)
         if not words:
             raise ProviderError("Gladia returned no words.")
         duration = ((raw.get("result") or {}).get("metadata") or {}).get("audio_duration")

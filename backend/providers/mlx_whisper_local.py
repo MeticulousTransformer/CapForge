@@ -43,10 +43,10 @@ class MlxWhisperProvider(ASRProvider):
             for w in seg.get("words", []):
                 raw_words.append({
                     "text": (w.get("word") or "").strip(),
-                    "start": w.get("start", 0.0), "end": w.get("end", 0.0),
+                    "start": w.get("start"), "end": w.get("end"),
                     "confidence": w.get("probability", 1.0),
                 })
-        words = words_from_simple(raw_words)
+        words = words_from_simple(raw_words, raw_response=raw)
         if not words:
             raise ProviderError("mlx-whisper produced no word timestamps.")
         return ProviderResult(raw=raw, words=words, timing_quality="word")

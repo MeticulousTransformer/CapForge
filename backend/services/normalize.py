@@ -10,12 +10,43 @@ Rules (AGENTS.md):
 """
 from __future__ import annotations
 
+import math
 from typing import List, Optional
 
 from services.models import Word
 
 SENTENCE_END = ".?!…"
 PUNCT_CHARS = ".,!?;:…\"'«»“”‘’()[]"
+
+
+class WordTimingError(ValueError):
+    """A speech word is missing a usable provider timing interval."""
+
+    def __init__(self, raw_response=None):
+        super().__init__(
+            "The provider returned a word without valid start and end times. "
+            "Choose a model with word timestamps or try another provider."
+        )
+        # Keep an already-received response available for debugging even when
+        # its timeline cannot become a normalized document.
+        self.raw_response = raw_response
+
+
+def word_times(item: dict, start_key="start", end_key="end", time_scale=1.0,
+               raw_response=None, allow_zero_duration=False):
+    """Read real times; absent timestamps must never turn into time zero."""
+    try:
+        if not isinstance(item, dict):
+            raise ValueError
+        start, end = item.get(start_key), item.get(end_key)
+        if isinstance(start, bool) or isinstance(end, bool):
+            raise ValueError
+        start, end = float(start) * time_scale, float(end) * time_scale
+        if not math.isfinite(start) or not math.isfinite(end) or start < 0 or end < start or (end == start and not allow_zero_duration):
+            raise ValueError
+    except (TypeError, ValueError, OverflowError):
+        raise WordTimingError(raw_response) from None
+    return start, end
 
 
 def split_trailing_punctuation(text: str):
@@ -30,7 +61,7 @@ def split_trailing_punctuation(text: str):
     return core, punct
 
 
-def words_from_tokens(tokens: List[dict]) -> List[Word]:
+def words_from_tokens(tokens: List[dict], raw_response=None) -> List[Word]:
     """Token stream (ElevenLabs style) -> Words.
 
     Token: {text, start, end, type?, speaker?, confidence?}
@@ -50,13 +81,15 @@ def words_from_tokens(tokens: List[dict]) -> List[Word]:
             if words:
                 words[-1].punctuationAfter += punct
             continue
+        start, end = word_times(t, raw_response=raw_response)
+        confidence = t.get("confidence")
         words.append(
             Word(
                 id=len(words),
                 text=core,
-                start=float(t.get("start", 0.0)),
-                end=float(t.get("end", 0.0)),
-                confidence=float(t.get("confidence", 1.0) or 1.0),
+                start=start,
+                end=end,
+                confidence=float(confidence) if confidence is not None else 1.0,
                 speaker=t.get("speaker"),
                 punctuationAfter=punct,
             )
@@ -72,6 +105,7 @@ def words_from_simple(
     confidence_key: str = "confidence",
     speaker_key: Optional[str] = None,
     time_scale: float = 1.0,
+    raw_response=None,
 ) -> List[Word]:
     """Flat word list (OpenAI, Gladia, AssemblyAI, Azure...) -> Words.
 
@@ -88,12 +122,13 @@ def words_from_simple(
                 words[-1].punctuationAfter += punct
             continue
         conf = it.get(confidence_key)
+        start, end = word_times(it, start_key, end_key, time_scale, raw_response=raw_response)
         words.append(
             Word(
                 id=len(words),
                 text=core,
-                start=round(float(it.get(start_key, 0.0)) * time_scale, 4),
-                end=round(float(it.get(end_key, 0.0)) * time_scale, 4),
+                start=start,
+                end=end,
                 confidence=float(conf) if conf is not None else 1.0,
                 speaker=it.get(speaker_key) if speaker_key else None,
                 punctuationAfter=punct,
@@ -106,18 +141,19 @@ def normalize_elevenlabs(raw: dict) -> List[Word]:
     tokens = [
         {
             "text": w.get("text", ""),
-            "start": w.get("start", 0.0),
-            "end": w.get("end", 0.0),
+            "start": w.get("start"),
+            "end": w.get("end"),
             "type": w.get("type", "word"),
             "speaker": w.get("speaker_id"),
+            "confidence": w.get("confidence"),
         }
         for w in raw.get("words", [])
     ]
-    return words_from_tokens(tokens)
+    return words_from_tokens(tokens, raw_response=raw)
 
 
 def normalize_openai_verbose(raw: dict) -> List[Word]:
-    return words_from_simple(raw.get("words", []), text_key="word")
+    return words_from_simple(raw.get("words", []), text_key="word", raw_response=raw)
 
 
 def estimate_words_from_text(text: str, start: float, end: float, confidence: float = 0.3) -> List[Word]:

@@ -11,6 +11,23 @@ from services import audio_extract
 
 
 class TestBundledAudio(unittest.TestCase):
+    def test_encoder_that_cannot_launch_has_a_repair_message(self):
+        with tempfile.TemporaryDirectory() as folder:
+            source = Path(folder) / "clip.mp4"
+            source.touch()
+            with patch.object(audio_extract, "find_ffmpeg", return_value="ffmpeg"), patch.object(audio_extract.subprocess, "run", side_effect=PermissionError("not executable")):
+                with self.assertRaisesRegex(RuntimeError, "installer"):
+                    audio_extract.extract_audio(str(source), folder)
+
+    def test_media_without_audio_has_an_editor_message(self):
+        with tempfile.TemporaryDirectory() as folder:
+            source = Path(folder) / "silent-video.mp4"
+            source.touch()
+            result = SimpleNamespace(returncode=1, stderr="Output file does not contain any stream")
+            with patch.object(audio_extract, "find_ffmpeg", return_value="ffmpeg"), patch.object(audio_extract.subprocess, "run", return_value=result):
+                with self.assertRaisesRegex(RuntimeError, "audio track"):
+                    audio_extract.extract_audio(str(source), folder)
+
     def test_bundled_binary_is_used_when_ffmpeg_is_not_on_path(self):
         bundled=SimpleNamespace(get_ffmpeg_exe=lambda: "/private/capforge/ffmpeg")
         with patch.object(audio_extract.shutil,"which",return_value=None), patch.object(audio_extract,"FFMPEG_CANDIDATES",[]), patch.dict(sys.modules,{"imageio_ffmpeg":bundled}):

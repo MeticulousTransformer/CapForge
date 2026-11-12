@@ -10,7 +10,7 @@ import os
 
 import requests
 
-from providers.base import ASRProvider, ProviderError, ProviderResult, lang_bcp47
+from providers.base import ASRProvider, ProviderError, ProviderResult, http_error, lang_bcp47
 from services.normalize import words_from_simple
 
 API_VERSION = "2024-11-15"
@@ -53,21 +53,30 @@ class AzureSpeechProvider(ASRProvider):
                 timeout=900,
             )
         if not resp.ok:
-            raise ProviderError(f"Azure Speech error {resp.status_code}: {resp.text[:500]}")
+            raise http_error(self.label, resp.status_code)
         raw = resp.json()
 
         raw_words = []
         for phrase in raw.get("phrases", []):
             conf = phrase.get("confidence", 1.0)
             for w in phrase.get("words", []):
-                start_ms = w.get("offsetMilliseconds", 0)
+                start_ms = w.get("offsetMilliseconds")
+                duration_ms = w.get("durationMilliseconds")
+                try:
+                    if isinstance(start_ms, bool) or isinstance(duration_ms, bool):
+                        raise ValueError
+                    end_ms = float(start_ms) + float(duration_ms)
+                except (TypeError, ValueError, OverflowError):
+                    # Keep missing/invalid timing visible to the normalizer;
+                    # punctuation-only tokens can still be merged without it.
+                    end_ms = None
                 raw_words.append({
                     "text": w.get("text", ""),
                     "start": start_ms,
-                    "end": start_ms + w.get("durationMilliseconds", 0),
+                    "end": end_ms,
                     "confidence": conf,
                 })
-        words = words_from_simple(raw_words, time_scale=0.001)
+        words = words_from_simple(raw_words, time_scale=0.001, raw_response=raw)
         if not words:
             raise ProviderError(
                 "Azure returned no word timestamps. Check locale support "

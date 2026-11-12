@@ -50,10 +50,15 @@ def extract_audio(media_path: str, out_dir: str) -> str:
     ]
     # ffmpeg diagnostics include media filenames, independent of Windows' ANSI
     # code page. Undecodable log bytes must not reject a successfully made WAV.
-    proc = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace")
+    try:
+        proc = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace")
+    except OSError:
+        raise RuntimeError("Audio preparation could not start. Run the CapForge installer again to repair the audio tool.") from None
     if proc.returncode != 0 or not os.path.isfile(out_path):
         tail = (proc.stderr or "")[-800:]
-        raise RuntimeError(f"ffmpeg failed (code {proc.returncode}): {tail}")
+        if "does not contain any stream" in tail.lower() or "matches no streams" in tail.lower():
+            raise RuntimeError("This media file has no usable audio track. Choose a video with sound or an audio file.")
+        raise RuntimeError("CapForge could not prepare this file's audio. Check that it plays with sound, or export a WAV file from your editor and choose that instead.")
     return out_path
 
 

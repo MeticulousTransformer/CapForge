@@ -1,6 +1,6 @@
 # Choose your AI
 
-Inside AE, open CapForge → **Setup**. Start the service and check connection.
+Inside AE, open CapForge → **Setup**. Click **Start service** and wait for **Studio connected**.
 Choose an AI service for its three-step guide. **Open account** opens your regular
 browser; your captions workflow stays inside After Effects.
 
