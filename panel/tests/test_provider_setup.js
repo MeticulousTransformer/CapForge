@@ -73,7 +73,8 @@ async function studio(options = {}) {
     $('language').value = 'ka-GE'; $('key-provider').value = 'ELEVENLABS_API_KEY'; $('provider').value = 'elevenlabs';
     const panes = ['source', 'design', 'transcript', 'setup'].map(id => $('tab-' + id));
     const windowEvents = {}, calls = [], storage = new Map();
-    const configured = new Set();
+    const configured = new Set(options.configured || []);
+    if (options.saved) storage.set("kcf.studio.v1", JSON.stringify(options.saved));
     const providers = () => guides.list.map(p => ({id: p.id, label: p.name, type: p.key ? 'cloud' : 'local', available: configured.has(p.id)}));
     const window = {
         addEventListener: (name, fn) => {windowEvents[name] = fn;},
@@ -89,7 +90,7 @@ async function studio(options = {}) {
             calls.push({route, payload});
             if (route === '/health') {if (options.health) await options.health(); return {ffmpeg: true};}
             if (route === '/providers') return {providers: providers()};
-            if (route === '/settings/provider-key') {configured.add(guides.get(payload.name).id); return {ok: true};}
+            if (route === '/settings/provider-key') {if (options.save) await options.save(); configured.add(guides.get(payload.name).id); return {ok: true};}
         }}
     };
     const document = {getElementById: $, createElement: () => element(), body: element(), addEventListener() {},
@@ -143,7 +144,8 @@ test('starting the service waits for readiness without another user click', asyn
         host: action => {if (action === 'startService') {started = true; launches++;}},
         health: () => {if (!started || ++checks < 3) throw new Error('Local service is offline.');}
     });
-    assert.equal($('save-key').disabled, true);
+    assert.equal($('save-key').disabled, false);
+    assert.equal(launches, 1, 'opening the panel starts it automatically');
     $('start-service').events.click(); await settle();
     assert.equal(launches, 1);
     assert.equal($('save-key').disabled, false);
@@ -156,12 +158,94 @@ test('a service that never starts unlocks controls and explains recovery', async
     const {$, settle} = await studio({health: () => {throw new Error('Local service is offline.');}});
     $('start-service').events.click(); await settle();
     assert.equal($('start-service').disabled, false);
-    assert.equal($('save-key').disabled, true);
-    assert.match($('notice-text').textContent, /Setup|installer/);
+    assert.equal($('save-key').disabled, false);
+    assert.equal($('setup-retry').hidden, false);
+    assert.match($('provider-setup-status').textContent, /repair|Try again/);
 });
 
 test('failed startup retains the actionable connection error', async () => {
     const {$, settle} = await studio({health: () => {throw new Error('An older CapForge service is running. Restart this computer.');}});
     $('start-service').events.click(); await settle();
     assert.match($('notice-text').textContent, /Restart this computer/);
+});
+
+
+test('paste and save during cold startup shares one launch and performs no transcription', async () => {
+    let release, launches = 0, started = false;
+    const waiting = new Promise(resolve => {release = resolve;});
+    const {$, calls, storage, settle} = await studio({
+        host: async action => {if (action === 'startService') {launches++; await waiting; started = true;}},
+        health: () => {if (!started) throw new Error('offline');}
+    });
+    assert.equal($('api-key').disabled, false);
+    assert.equal($('save-key').disabled, false);
+    $('api-key').value = 'fixture-secret';
+    $('save-key').events.click(); await settle();
+    assert.equal(launches, 1);
+    release(); await settle();
+    assert.equal(calls.filter(c => c.route === '/settings/provider-key').length, 1);
+    assert.equal($('api-key').value, '');
+    assert.equal($('tab-source').hidden, false);
+    assert.ok(!calls.some(c => /transcribe|extract_audio/.test(c.route)));
+    assert.ok(![...storage.values()].some(value => value.includes('fixture-secret')));
+});
+
+test('startup failure keeps pasted key and Save retries successfully', async () => {
+    let broken = true;
+    const {$, calls, settle} = await studio({health: () => {if (broken) throw new Error('offline');}});
+    $('api-key').value = 'fixture-secret';
+    $('save-key').events.click(); await settle();
+    assert.equal($('api-key').value, 'fixture-secret');
+    assert.equal($('save-key').disabled, false);
+    assert.equal(calls.filter(c => c.route === '/settings/provider-key').length, 0);
+    broken = false;
+    $('save-key').events.click(); await settle();
+    assert.equal($('api-key').value, '');
+    assert.equal($('tab-source').hidden, false);
+});
+
+test('key write failure stays in onboarding with key intact and inline error', async () => {
+    const {$, settle} = await studio({save: () => {throw new Error('Could not save your key.');}});
+    $('api-key').value = 'fixture-secret';
+    $('save-key').events.click(); await settle();
+    assert.equal($('api-key').value, 'fixture-secret');
+    assert.match($('provider-setup-status').textContent, /Could not save/);
+    assert.equal($('tab-setup').hidden, false);
+});
+
+test('first use opens onboarding, returning configured provider opens footage', async () => {
+    const first = await studio();
+    assert.equal(first.$('tab-setup').hidden, false);
+    const returning = await studio({configured: ['openai'], saved: {provider: 'openai'}});
+    assert.equal(returning.$('tab-source').hidden, false);
+    assert.equal(returning.$('provider').value, 'openai');
+});
+
+
+test('background readiness respects navigation and reconnects on focus', async () => {
+    let release, online = false, starts = 0;
+    const waiting = new Promise(resolve => {release = resolve;});
+    const {$, windowEvents, settle} = await studio({
+        host: async action => {if (action === 'startService') {starts++; await waiting; online = true;}},
+        health: () => {if (!online) throw new Error('offline');}
+    });
+    $('use-provider').events.click();
+    release(); await settle();
+    assert.equal($('tab-source').hidden, false, 'do not pull the editor back to setup');
+    online = false;
+    windowEvents.focus(); await settle();
+    assert.equal(starts, 2, 'reconnect automatically when returning to the panel');
+});
+
+
+test('Try again retries a failed save, not just the connection', async () => {
+    let fail = true;
+    const {$, calls, settle} = await studio({save: () => {if (fail) throw new Error('Could not save key');}});
+    $('api-key').value = 'fixture-secret';
+    $('save-key').events.click(); await settle();
+    fail = false;
+    $('setup-retry').events.click(); await settle();
+    assert.equal(calls.filter(c => c.route === '/settings/provider-key').length, 2);
+    assert.equal($('api-key').value, '');
+    assert.equal($('tab-source').hidden, false);
 });

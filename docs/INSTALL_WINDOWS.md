@@ -16,8 +16,8 @@ you do not need to download or extract a ZIP.
 5. Click **Install CapForge** and wait for the installed message.
 6. Open After Effects and choose **Window → Extensions → CapForge**. Some AE
    versions call this menu **Extensions (Legacy)**.
-7. In CapForge's **Setup** section, click **Start service**. Once connected, add
-   your AI account or try the built-in demo. Follow [Your first captions](QUICK_START.md).
+7. CapForge connects automatically. In **AI settings**, paste your key and click
+   **Save and continue**, or try the built-in demo. Follow [Your first captions](QUICK_START.md).
 
 Setup installs for your account. You do not need to install Python, FFmpeg,
 certificates, or configure PATH. After Effects itself must already be installed.
@@ -34,7 +34,7 @@ a work computer's policy may require administrator approval. Microsoft explains
 
 ## Updates and repair
 
-In the AE panel, choose **Setup → Check for updates → Update**. CapForge selects
+In the AE panel, choose **AI settings → Updates → Check for updates**. CapForge selects
 the Windows update automatically and opens Setup. Save your project, close AE,
 and click **Install CapForge**. Reopen AE after setup finishes. Your keys and
 exported transcripts remain in place.

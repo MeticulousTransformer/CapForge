@@ -15,10 +15,10 @@
    label this menu **Extensions (Legacy)**).
 4. Play the built-in preview and choose a style. Open **Design** to change the
    font, colors, layout or animation controls. Use a Georgian-supporting font.
-5. In **Setup**, click **Start service** and wait for **Studio connected**. Connection checks happen automatically. Use **Check connection** to refresh after other setup changes. Select a
-   service and follow its three-step guide. Open its account page, paste your own
-   key and choose **Save key & use this AI**. Start with ElevenLabs for Georgian.
-   See [AI setup](AI_SETUP.md) for account links and optional Google/local setup.
+5. CapForge gets ready automatically. On first use, choose your AI in
+   **AI settings**, paste your key, and click **Save and continue**. You can paste
+   while it starts. Returning users go straight to Source with their saved AI.
+   Open **Where do I get a key?** for account instructions; see [AI setup](AI_SETUP.md).
 6. In **Source**, choose a clip, language and words per caption. Click
    **Transcribe clip**, then review and edit individual words in **Words**.
 7. Open the destination composition in AE. Click **Generate captions**. A fresh
@@ -71,7 +71,7 @@ The canvas approximates typography and motion; motion blur renders in AE.
 speaker identification, caption minimums/durations and a manual media location.
 Prepare audio only saves a WAV without sending it to a transcription provider.
 
-**No connection:** Click **Start service** and wait for CapForge to connect.
+**No connection:** CapForge reconnects automatically. Use **Try again** in AI settings if it cannot get ready. Technical controls are under **Troubleshooting**.
 If it cannot connect, it shows the error and lets you retry. If another copy of the service uses port 8765, close that
 copy before starting the installed service. The installed panel uses its own token.
 

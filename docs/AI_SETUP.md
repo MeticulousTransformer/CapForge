@@ -1,11 +1,11 @@
 # Choose your AI
 
-Inside AE, open CapForge → **Setup**. Click **Start service** and wait for **Studio connected**.
-Choose an AI service for its three-step guide. **Open account** opens your regular
+Inside AE, open CapForge → **AI settings**. CapForge starts and connects automatically.
+Choose an AI service. Expand **Where do I get a key?** for account instructions. **Open account** opens your regular
 browser; your captions workflow stays inside After Effects.
 
 An API key is a private access code for your AI account. Paste it, then choose
-**Save key & use this AI**. The field clears and Source selects that provider.
+**Save and continue**. The field clears and Source selects that provider.
 Saving checks the key’s format and stores it; it does not verify the account,
 check billing or spend transcription credits. Try a short clip first.
 

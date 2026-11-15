@@ -16,8 +16,8 @@ Silicon Macs. Keep an internet connection available for first setup.
 6. Click **Open After Effects**, then choose **Window → Extensions → CapForge**.
    Some AE versions call this menu **Extensions (Legacy)**. If AE was still open
    during installation, quit and reopen it first.
-7. In CapForge's **Setup** section, click **Start service**. Once connected, add
-   your AI account or try the built-in demo. Follow [Your first captions](QUICK_START.md).
+7. CapForge connects automatically. In **AI settings**, paste your key and click
+   **Save and continue**, or try the built-in demo. Follow [Your first captions](QUICK_START.md).
 
 No separate Python, FFmpeg, terminal commands, or certificate installation is
 needed. After Effects itself must already be installed.
@@ -39,7 +39,7 @@ your administrator's approval.
 
 ## Updates and repair
 
-In the AE panel, choose **Setup → Check for updates → Update**. CapForge selects
+In the AE panel, choose **AI settings → Updates → Check for updates**. CapForge selects
 the Mac update automatically and opens Setup. Save your project, close AE, and
 click **Update / Repair**. Your keys and exported transcripts remain in place.
 

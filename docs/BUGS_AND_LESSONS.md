@@ -423,3 +423,22 @@ The code for this flow is ready to test with a real Developer ID identity;
 mocked tests cannot replace Apple's acceptance. Account setup and final desktop
 checks are documented in [Mac signing](MAC_SIGNING.md). Normal first-open
 confirmation can remain even after the blocking trust warning is resolved.
+
+
+## 17. A disabled button can hide the wrong responsibility
+
+Saving an API key used to require the editor to start the local service first.
+The code was enforcing a technical dependency, but the screen gave the editor
+an extra job and a disabled button. The app now owns that dependency: opening
+the panel starts it, and Save and continue waits for the same startup attempt.
+The key field stays editable while background startup runs.
+
+One shared promise prevents a race: if opening the panel and saving a key both
+need startup, they wait for one attempt instead of launching twice. Failure
+clears that promise so a later retry can genuinely try again. The typed key stays
+in the field until storage succeeds; it never enters browser storage.
+
+Retry also has to repeat the failed action. Review caught a button that retried
+connection after a failed save, then misleadingly looked successful without
+saving. A regression test now checks that retry sends the save again. A clear
+label is useful only when the button performs the action it promises.

@@ -33,13 +33,13 @@
     </main>
     <aside class="inspector" aria-label="Caption controls">
       <div class="inspector-heading"><span class="eyebrow">YOUR WORKSPACE</span><button id="back-preview" class="text-button">Preview ↑</button><button id="reset-design" class="text-button">Reset design</button></div>
-      <nav class="tabs" role="tablist" aria-label="Workspace sections"><button id="source-tab" role="tab" aria-controls="tab-source" data-tab="source" aria-selected="true">Source</button><button id="design-tab" role="tab" aria-controls="tab-design" data-tab="design" aria-selected="false" tabindex="-1">Design</button><button id="transcript-tab" role="tab" aria-controls="tab-transcript" data-tab="transcript" aria-selected="false" tabindex="-1">Words</button><button id="setup-tab" role="tab" aria-controls="tab-setup" data-tab="setup" aria-selected="false" tabindex="-1">Setup</button></nav>
+      <nav class="tabs" role="tablist" aria-label="Workspace sections"><button id="source-tab" role="tab" aria-controls="tab-source" data-tab="source" aria-selected="true">Source</button><button id="design-tab" role="tab" aria-controls="tab-design" data-tab="design" aria-selected="false" tabindex="-1">Design</button><button id="transcript-tab" role="tab" aria-controls="tab-transcript" data-tab="transcript" aria-selected="false" tabindex="-1">Words</button><button id="setup-tab" role="tab" aria-controls="tab-setup" data-tab="setup" aria-selected="false" tabindex="-1">AI settings</button></nav>
       <section id="tab-source" class="tab-pane" role="tabpanel" aria-labelledby="source-tab">
         <div class="pane-title"><span class="step">01</span><div><h2>Start with your story.</h2><p>Bring in a clip, or explore the demo.</p></div></div>
         <div class="source-card"><span class="source-symbol" aria-hidden="true">↥</span><strong id="media-name">Choose your media</strong><span id="media-detail">Video or audio, with speech.</span><button id="choose-media" class="secondary-button">Browse files</button><button id="selected-media" class="text-button">Use selected AE footage</button></div>
         <label class="field">Language<select id="language"><option value="ka-GE">ქართული · Georgian</option><option value="en-US">English</option><option value="auto">Detect automatically</option></select></label>
         <label class="field">Transcription provider<select id="provider"><option value="elevenlabs">ElevenLabs Scribe v2</option></select></label>
-        <p id="provider-detail" class="field-hint">Connect the local service in Setup to check providers.</p>
+        <p id="provider-detail" class="field-hint">Getting ready… Add your key in AI settings to transcribe.</p>
         <button id="setup-ai" class="text-button">Set up this AI · account &amp; key guide ↗</button>
         <div class="field-row"><label class="field">Words per caption<input id="max-words" type="number" min="1" max="6" value="4"></label><label class="field">Pause break (s)<input id="pause-break" type="number" min="0.1" max="5" step="0.05" value="0.55"></label></div>
         <details><summary>Transcription options</summary>
@@ -133,10 +133,32 @@
         <div id="word-editor" class="word-editor"></div>
       </section>
       <section id="tab-setup" class="tab-pane" role="tabpanel" aria-labelledby="setup-tab" hidden>
-        <div class="pane-title"><span class="step">✦</span><div><h2>A good place to start.</h2><p>One local service. Your choice of AI.</p></div></div>
+        <div class="pane-title"><span class="step">✦</span><div><h2>Connect your AI.</h2><p>Paste your key once. Then start captioning.</p></div></div>
+        <div class="provider-onboarding">
+          <p class="field-hint">An API key lets CapForge use your AI account. Think of it as a private access code. You do not need to upload a clip on the provider’s website.</p>
+          <label class="field">Choose an AI service<select id="key-provider"><optgroup label="Cloud · paste your own key"><option value="ELEVENLABS_API_KEY">ElevenLabs · start here for Georgian</option><option value="OPENAI_API_KEY">OpenAI · Whisper</option><option value="GLADIA_API_KEY">Gladia</option><option value="ASSEMBLYAI_API_KEY">AssemblyAI</option><option value="AZURE_SPEECH_KEY">Azure Speech</option></optgroup><optgroup label="Advanced · additional setup"><option value="google_chirp">Google Chirp</option><option value="whisper_cpp">Local whisper.cpp</option><option value="faster_whisper">Local faster-whisper</option><option value="mlx_whisper">Local MLX Whisper · Mac</option></optgroup></select></label>
+          <details class="provider-guide"><summary id="provider-help-title">Where do I get a key?</summary><article aria-labelledby="provider-guide-name">
+            <span id="provider-guide-badge" class="provider-badge"></span><h4 id="provider-guide-name"></h4><p id="provider-guide-description"></p>
+            <button id="provider-account" class="secondary-button provider-link">Open account page ↗</button>
+            <ol id="provider-guide-steps" class="provider-steps"></ol>
+            <p id="provider-guide-note" class="provider-note"></p>
+          </article></details>
+          <div id="provider-key-fields">
+            <label class="field">Your API key<div class="key-input"><input id="api-key" type="password" autocomplete="off" spellcheck="false" placeholder="Paste your provider key"><button id="toggle-key" type="button" aria-label="Show API key" aria-pressed="false">Show</button></div></label>
+            <label class="field" id="azure-region-field" hidden>Resource region<input id="azure-region" autocomplete="off" spellcheck="false" placeholder="e.g. westeurope"></label>
+            <button id="save-key" class="primary-button full" disabled>Save and continue</button>
+            <p class="fine-print">Saved in a local configuration file on this computer. Keep it private. Keys stay out of browser storage and exported looks.</p>
+          </div>
+          <p id="provider-setup-status" class="field-hint" role="status" aria-live="polite"></p>
+          <button id="setup-retry" class="secondary-button full" hidden>Try again</button>
+          <button id="use-provider" class="text-button full">Choose footage / try the demo →</button>
+        </div>
+        <details><summary>Troubleshooting</summary>
         <ol class="setup-checks"><li><span id="host-dot" class="status-dot"></span><div><strong>After Effects</strong><p id="host-status">Browser demonstration mode</p></div></li><li><span id="service-dot" class="status-dot"></span><div><strong>Local transcription service</strong><p id="service-status">Checking connection…</p></div></li><li><span id="ffmpeg-dot" class="status-dot"></span><div><strong>Audio preparation</strong><p id="ffmpeg-status">Waiting for service</p></div></li><li><span id="key-dot" class="status-dot"></span><div><strong>Transcription provider</strong><p id="key-status">Add your own API key below</p></div></li></ol>
         <div class="field-row"><button id="start-service" class="secondary-button">Start service</button><button id="reconnect" class="secondary-button">Check connection</button></div>
-        <p class="field-hint">Run the guided installer once. Then use Start service when you need transcription. Demo and JSON generation work without cloud setup.</p>
+        <p class="field-hint">CapForge connects automatically. These controls help diagnose a problem. If retry fails, save your project, close After Effects and open CapForge from Applications to repair the installation.</p>
+        </details>
+        <details><summary>Updates</summary>
         <section class="provider-onboarding" aria-labelledby="updates-title">
           <p class="eyebrow">CAPFORGE 0.3.3</p><h3 id="updates-title">Keep your studio up to date.</h3>
           <p id="update-status" class="field-hint" role="status" aria-live="polite">Check for improvements here. Your saved keys, looks and exports stay in place.</p>
@@ -144,25 +166,7 @@
           <p id="update-notes" class="field-hint"></p>
           <p class="fine-print">Update opens Setup for you. Save your project and close After Effects before clicking Install, then reopen After Effects when Setup finishes.</p>
         </section>
-        <div class="provider-onboarding">
-          <p class="eyebrow">YOUR AI, YOUR CHOICE</p><h3>Connect once. Create freely.</h3>
-          <p class="field-hint">An API key lets CapForge use your AI account. Think of it as a private access code. You do not need to upload a clip on the provider’s website.</p>
-          <label class="field">Choose an AI service<select id="key-provider"><optgroup label="Cloud · paste your own key"><option value="ELEVENLABS_API_KEY">ElevenLabs · start here for Georgian</option><option value="OPENAI_API_KEY">OpenAI · Whisper</option><option value="GLADIA_API_KEY">Gladia</option><option value="ASSEMBLYAI_API_KEY">AssemblyAI</option><option value="AZURE_SPEECH_KEY">Azure Speech</option></optgroup><optgroup label="Advanced · additional setup"><option value="google_chirp">Google Chirp</option><option value="whisper_cpp">Local whisper.cpp</option><option value="faster_whisper">Local faster-whisper</option><option value="mlx_whisper">Local MLX Whisper · Mac</option></optgroup></select></label>
-          <article class="provider-guide" aria-labelledby="provider-guide-name">
-            <span id="provider-guide-badge" class="provider-badge"></span><h4 id="provider-guide-name"></h4><p id="provider-guide-description"></p>
-            <button id="provider-account" class="secondary-button provider-link">Open account page ↗</button>
-            <ol id="provider-guide-steps" class="provider-steps"></ol>
-            <p id="provider-guide-note" class="provider-note"></p>
-          </article>
-          <div id="provider-key-fields">
-            <label class="field">Your API key<div class="key-input"><input id="api-key" type="password" autocomplete="off" spellcheck="false" placeholder="Paste your provider key"><button id="toggle-key" type="button" aria-label="Show API key" aria-pressed="false">Show</button></div></label>
-            <label class="field" id="azure-region-field" hidden>Resource region<input id="azure-region" autocomplete="off" spellcheck="false" placeholder="e.g. westeurope"></label>
-            <button id="save-key" class="primary-button full" disabled>Save key &amp; use this AI</button>
-            <p class="fine-print">Saved in a local configuration file on this computer. Keep it private. Keys stay out of browser storage and exported looks.</p>
-          </div>
-          <p id="provider-setup-status" class="field-hint" role="status" aria-live="polite"></p>
-          <button id="use-provider" class="text-button full">Continue to Source →</button>
-        </div>
+        </details>
         <details><summary>Help &amp; privacy</summary><p>Cloud transcription sends extracted audio to the provider you select. Local providers can work offline once their packages and models are installed.</p><p>CapForge creates a fresh precomp on each run. Use AE’s Undo to undo a generation.</p><p>For additional Google and local Whisper settings, see docs/AI_SETUP.md in your installation folder. Check connection after setup.</p><p>Keep the installation folder in place. Your exports and raw provider responses stay in its exports folder.</p></details>
         <button id="open-guide" class="text-button full">Open quick start guide</button>
       </section>

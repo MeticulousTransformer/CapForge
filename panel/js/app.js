@@ -9,16 +9,19 @@
     var updates = window.KCF_Updates.create(api, {status: $("update-status"), notes: $("update-notes"), check: $("check-updates"), install: $("install-update")});
     var state = { doc: transcript.demo("ka-GE"), look: settings.normalize({}), media: null, providers: [], connected: false, ffmpeg: false, busy: false, category: "All", comp: null, renderedCaption: null, wordLimit: 80 };
     var guideFocus = null;
+    var readyPromise = null, startupError = "", initialRoute = true, userNavigated = false, preferredProvider = "";
     try {
         var stored = JSON.parse(localStorage.getItem("kcf.studio.v1") || "null");
+        if (stored && providerGuide.get(stored.provider)) { preferredProvider = stored.provider; }
         if (stored) { state.look = settings.normalize(stored.look); $("language").value = stored.language || "ka-GE"; }
     } catch (error) { /* A corrupt/stale saved look should not block the panel. */ }
     if (!titles.get(state.look.preset)) { state.look.preset = "highlight_word"; }
     state.doc = transcript.demo($("language").value);
-    function persist() { try { localStorage.setItem("kcf.studio.v1", JSON.stringify({ look: state.look, language: $("language").value })); } catch (error) { /* Storage can be disabled by the host. */ } }
+    function persist() { try { localStorage.setItem("kcf.studio.v1", JSON.stringify({ look: state.look, language: $("language").value, provider: preferredProvider || $("provider").value })); } catch (error) { /* Storage can be disabled by the host. */ } }
     function notice(message) { $("notice-text").textContent = message; $("notice").hidden = false; }
     function status(message) { $("status").textContent = message; }
-    function tab(name) {
+    function tab(name, automatic) {
+        if (!automatic) { userNavigated = true; }
         document.querySelectorAll("[data-tab]").forEach(function (button) { button.setAttribute("aria-selected", String(button.dataset.tab === name)); button.tabIndex = button.dataset.tab === name ? 0 : -1; });
         document.querySelectorAll(".tab-pane").forEach(function (pane) { pane.hidden = pane.id !== "tab-" + name; });
     }
@@ -31,7 +34,8 @@
         $("transcribe").disabled = !live || state.busy || !state.media || !state.connected || !state.ffmpeg || !provider || !provider.available;
         $("prepare-audio").disabled = !live || state.busy || !state.media || !state.connected || !state.ffmpeg;
         $("scan-providers").disabled = !live || state.busy;
-        $("save-key").disabled = !live || state.busy || !state.connected;
+        $("save-key").disabled = !live || state.busy;
+        $("setup-retry").disabled = !live || state.busy;
         $("use-provider").disabled = state.busy;
         $("setup-ai").disabled = state.busy;
         $("key-provider").disabled = state.busy;
@@ -138,7 +142,7 @@
     }
     function updateProvider() {
         var provider = currentProvider();
-        $("provider-detail").textContent = provider ? (provider.available ? "Ready · " + (provider.type === "local" ? "runs on this computer" : "cloud transcription") : "Setup needed · " + (provider.detail || "configure this provider")) : "Connect the local service in Setup to check providers.";
+        $("provider-detail").textContent = provider ? (provider.available ? "Ready · " + (provider.type === "local" ? "runs on this computer" : "cloud transcription") : "Setup needed · " + (provider.detail || "configure this provider")) : "Getting ready… Add your key in AI settings to transcribe.";
         if (provider && $("language").value === "ka-GE" && provider.id !== "elevenlabs") { $("provider-detail").textContent += ". Georgian quality varies; start with ElevenLabs."; }
         $("key-status").textContent = provider && provider.available ? "Selected provider is configured" : "Selected provider needs configuration";
         setDot("key-dot", provider && provider.available); readiness();
@@ -147,7 +151,8 @@
     function updateGuideStatus() {
         var guide = providerGuide.get($("key-provider").value);
         var configured = state.providers.some(function (p) { return p.id === guide.id && p.available; });
-        $("provider-setup-status").textContent = !bridge.available ? "Demo mode · save your key when this panel is open inside After Effects." : !state.connected ? "Start the local service above, then check connection to save a key." : configured ? "Configured on this computer. Your first transcription checks the account and timing." : guide.key ? "Ready for your key. Saving it does not transcribe audio or check billing." : "Complete the additional setup, then check connection above.";
+        $("setup-retry").hidden = !startupError;
+        $("provider-setup-status").textContent = !bridge.available ? "Open CapForge inside After Effects to save your key." : startupError ? startupError : !state.connected ? "Getting ready… You can paste your key now." : configured ? "Key saved on this computer. Your first transcription checks account access." : guide.key ? "Paste your key, then save and continue. No transcription is charged until you choose Transcribe." : "Follow the additional setup instructions below.";
     }
     function renderProviderGuide() {
         var guide = providerGuide.get($("key-provider").value);
@@ -159,6 +164,7 @@
         $("provider-guide-steps").textContent = "";
         guide.steps.forEach(function (step) { var item = document.createElement("li"); item.textContent = step; $("provider-guide-steps").appendChild(item); });
         $("provider-key-fields").hidden = !guide.key;
+        $("provider-help-title").textContent = guide.key ? "Where do I get a key?" : "Setup instructions";
         $("azure-region-field").hidden = guide.id !== "azure_speech";
         // Switching accounts must never leave a different provider's key in the form.
         $("api-key").value = ""; hideKey(); updateGuideStatus();
@@ -166,7 +172,7 @@
     function hideKey() { $("api-key").type = "password"; $("toggle-key").textContent = "Show"; $("toggle-key").setAttribute("aria-label", "Show API key"); $("toggle-key").setAttribute("aria-pressed", "false"); }
     function chooseGuideProvider() {
         var guide = providerGuide.get($("key-provider").value);
-        if (state.providers.some(function (p) { return p.id === guide.id; })) { $("provider").value = guide.id; $("model").value = ""; updateProvider(); }
+        if (state.providers.some(function (p) { return p.id === guide.id; })) { $("provider").value = guide.id; $("model").value = ""; preferredProvider = guide.id; updateProvider(); persist(); }
         tab("source"); $("provider").focus();
     }
     function context() {
@@ -191,16 +197,25 @@
             state.ffmpeg = !!health.ffmpeg;
             return api.request("/providers");
         }).then(function (result) {
-            state.connected = true; state.providers = result.providers;
-            var value = $("provider").value; $("provider").textContent = "";
+            state.connected = true; startupError = ""; state.providers = result.providers;
+            var value = initialRoute && preferredProvider ? preferredProvider : $("provider").value; $("provider").textContent = "";
             result.providers.forEach(function (provider) { var option = document.createElement("option"); option.value = provider.id; option.textContent = provider.label + (provider.available ? " · ready" : " · setup needed"); $("provider").appendChild(option); });
             if (state.providers.some(function (p) { return p.id === value; })) { $("provider").value = value; }
             setDot("service-dot", true); setDot("connection-dot", true); setDot("ffmpeg-dot", state.ffmpeg);
             $("service-status").textContent = "Connected · running on this computer"; $("ffmpeg-status").textContent = state.ffmpeg ? "Ready to prepare your audio" : "Audio support missing · run the installer to repair";
-            updateProvider(); status("Studio connected");
+            if (initialRoute) {
+                var chosen = currentProvider();
+                if (!chosen || !chosen.available) {
+                    var available = state.providers.filter(function (p) { return p.available; });
+                    if (available.length) { $("provider").value = available[0].id; }
+                }
+                if (!userNavigated && !state.busy) { tab(state.providers.some(function (p) { return p.available; }) ? "source" : "setup", true); }
+                initialRoute = false;
+            }
+            preferredProvider = $("provider").value; updateProvider(); persist(); status("Ready to choose your footage");
         }).catch(function (error) {
             state.connected = false; state.ffmpeg = false; ["service-dot", "connection-dot", "ffmpeg-dot"].forEach(function (id) { setDot(id, false); });
-            $("service-status").textContent = "Offline · start the service below"; $("ffmpeg-status").textContent = "Waiting for service"; status("Preview ready · service offline"); readiness();
+            $("service-status").textContent = "Not connected"; $("ffmpeg-status").textContent = "Waiting for service"; status("Getting ready…"); readiness();
             updateGuideStatus();
             if (!quiet && error.message.indexOf("offline") < 0) {
                 if (error.message.indexOf("engine") >= 0 || error.message.indexOf("bridge") >= 0) { $("host-status").textContent = "Caption engine needs attention · see message"; }
@@ -212,10 +227,28 @@
     function waitForService(attempts) {
         return connect(true).then(function (error) {
             if (state.connected) { status("Studio connected · ready to transcribe"); return; }
-            if (attempts <= 1) { throw new Error((error ? error.message + " " : "") + "The local service did not become ready. Check its startup window for an error, then retry. If it keeps failing, close After Effects and run the CapForge installer to repair Setup."); }
-            status("Waiting for the local service…");
+            if (attempts <= 1) { throw new Error((error ? error.message + " " : "") + "CapForge could not get ready. Try again. If this continues, save your project, close After Effects and open CapForge from Applications to repair the installation."); }
+            status("Getting ready…");
             return new Promise(function (resolve) { setTimeout(resolve, 1000); }).then(function () { return waitForService(attempts - 1); });
         });
+    }
+    // Startup and Save share one attempt, so rapid clicks never launch duplicates.
+    // Background startup does not set busy: the editor can paste while it warms up.
+    function ensureReady() {
+        if (readyPromise) { return readyPromise; }
+        startupError = ""; updateGuideStatus();
+        readyPromise = connect(true).then(function () {
+            if (state.connected) { return; }
+            return bridge.call("startService").then(function () { return waitForService(10); });
+        }).then(function () {
+            readyPromise = null; startupError = ""; updateGuideStatus();
+        }, function (error) {
+            readyPromise = null; startupError = error.message; updateGuideStatus();
+            status("Needs attention · try again");
+            if (!userNavigated && initialRoute) { tab("setup", true); }
+            throw error;
+        });
+        return readyPromise;
     }
     function exportFile(name, data, kind) {
         if (bridge.available) { return bridge.call("saveJSON", { kind: kind, data: data }).then(function (saved) { if (saved) { status(kind === "look" ? "Look saved" : "Transcript exported"); } }); }
@@ -232,7 +265,7 @@
         $("guide-overlay").hidden = !open;
         if (open) { guideFocus = document.activeElement; $("close-guide").focus(); } else { if (guideFocus) { guideFocus.focus(); } try { localStorage.setItem("kcf.guide.seen", "yes"); } catch (error) {} }
     }
-    document.querySelectorAll("[data-tab]").forEach(function (button) { button.addEventListener("click", function () { tab(button.dataset.tab); }); });
+    document.querySelectorAll("[data-tab]").forEach(function (button) { button.addEventListener("click", function () { userNavigated = true; tab(button.dataset.tab); }); });
     document.querySelector(".tabs").addEventListener("keydown", function (event) {
         if (["ArrowLeft", "ArrowRight", "Home", "End"].indexOf(event.key) < 0) { return; }
         var buttons = Array.from(this.querySelectorAll("[data-tab]")), index = buttons.indexOf(document.activeElement);
@@ -285,7 +318,7 @@
     function choose(action) { operation("Choosing media…", function () { return bridge.call(action).then(function (media) { if (media) { selectMedia(media); status("Media selected"); } else { status("Ready"); } }); }); }
     $("media-path").addEventListener("change", function () { var path = this.value.trim(); selectMedia(path ? {path: path, name: path.split(/[\\/]/).pop()} : null); });
     $("language").addEventListener("change", function () { persist(); updateProvider(); if (state.doc.provider === "demo") { setDocument(transcript.demo(this.value), "Built-in sample. Import JSON or transcribe your own clip."); } });
-    $("provider").addEventListener("change", function () { $("model").value = ""; updateProvider(); });
+    $("provider").addEventListener("change", function () { $("model").value = ""; preferredProvider = this.value; updateProvider(); persist(); });
     $("transcribe").addEventListener("click", function () { operation("Transcribing your clip…", function () {
         var options = {keyterms: $("keyterms").value.split(",").map(function (word) { return word.trim(); }).filter(Boolean), diarize: $("diarize").checked};
         if ($("model").value.trim()) { options.model = $("model").value.trim(); }
@@ -306,26 +339,40 @@
     $("install-update").addEventListener("click", function () { operation("Preparing update…", function () { return updates.install().then(function () { status("Update setup is opening"); }); }); });
     $("scan-providers").addEventListener("click", function () { operation("Refreshing providers…", connect); });
     $("prepare-audio").addEventListener("click", function () { operation("Preparing audio…", function () { return api.request("/extract_audio", {mediaPath: state.media.path}).then(function (result) { status("Audio prepared · " + result.duration.toFixed(1) + "s"); notice("WAV saved: " + result.audio); }); }); });
-    $("start-service").addEventListener("click", function () { operation("Checking local service…", function () {
-        return connect().then(function () {
-            if (state.connected) { status("Service is already running · ready to transcribe"); return; }
-            return bridge.call("startService").then(function () { return waitForService(10); });
-        });
-    }); });
+    function retrySetup() { operation("Getting ready…", ensureReady); }
+    $("start-service").addEventListener("click", retrySetup);
+    $("setup-retry").addEventListener("click", function () {
+        if (!$("provider-key-fields").hidden && $("api-key").value.trim()) { saveKey(); } else { retrySetup(); }
+    });
     $("key-provider").addEventListener("change", renderProviderGuide);
     $("setup-ai").addEventListener("click", function () { var guide = providerGuide.get($("provider").value); if (guide) { $("key-provider").value = guide.key || guide.id; renderProviderGuide(); } tab("setup"); $("key-provider").focus(); });
     $("provider-account").addEventListener("click", function () { try { window.KCF_ExternalLinks.open(providerGuide.get($("key-provider").value).url); } catch (error) { notice(error.message); } });
     $("toggle-key").addEventListener("click", function () { var show = $("api-key").type === "password"; $("api-key").type = show ? "text" : "password"; this.textContent = show ? "Hide" : "Show"; this.setAttribute("aria-label", show ? "Hide API key" : "Show API key"); this.setAttribute("aria-pressed", String(show)); });
     $("use-provider").addEventListener("click", chooseGuideProvider);
-    $("save-key").addEventListener("click", function () { operation("Saving provider key…", function () {
-        var key = $("api-key").value.trim(); if (!key) { throw new Error("Paste your provider API key first."); }
-        var payload = { name: $("key-provider").value, value: key }; if (payload.name === "AZURE_SPEECH_KEY") { payload.region = $("azure-region").value.trim(); }
-        return api.request("/settings/provider-key", payload).then(function () { $("api-key").value = ""; hideKey(); return connect(); }).then(function () { chooseGuideProvider(); status("Key saved · choose a clip to try your AI"); });
-    }); });
+    function saveKey() { operation("Saving your key…", function () {
+        var key = $("api-key").value.trim();
+        if (!key) { startupError = "Paste your API key first."; updateGuideStatus(); throw new Error(startupError); }
+        var payload = { name: $("key-provider").value, value: key };
+        if (payload.name === "AZURE_SPEECH_KEY") { payload.region = $("azure-region").value.trim(); }
+        $("save-key").textContent = "Saving…";
+        return ensureReady().then(function () { return api.request("/settings/provider-key", payload); }).then(function () {
+            $("api-key").value = ""; hideKey();
+            return connect(true);
+        }).then(function () {
+            if (!state.connected) { throw new Error("Your key was saved, but CapForge lost its connection. Try again to reconnect."); }
+            chooseGuideProvider(); status("Key saved · choose your footage");
+        }).catch(function (error) {
+            startupError = error.message; updateGuideStatus(); throw error;
+        }).then(function () { $("save-key").textContent = "Save and continue"; }, function (error) {
+            $("save-key").textContent = "Save and continue"; throw error;
+        });
+    }); }
+    $("save-key").addEventListener("click", saveKey);
     $("generate").addEventListener("click", function () { operation("Generating editable caption layers…", function () { var doc = transcript.validate(state.doc), look = settings.forAE(state.look); return bridge.call("generate", { document: doc, settings: look }).then(function (result) { status("Created " + result.name); notice("Your captions are ready in a fresh precomp. Play the AE timeline to check the final result."); return context(); }); }); });
     // Check the selected composition when returning from the AE timeline.
-    window.addEventListener("focus", function () { if (bridge.available && !state.busy) { context().catch(function (error) { notice(error.message); }); } });
+    window.addEventListener("focus", function () { if (bridge.available && !state.busy) { ensureReady().catch(function () { /* Inline retry is available in AI settings. */ }); } });
     window.addEventListener("beforeunload", preview.destroy);
     window.addEventListener("blur", hideKey);
-    syncLook(); gallery(); renderWords(); renderProviderGuide(); readiness(); connect();
+    syncLook(); gallery(); renderWords(); renderProviderGuide(); readiness();
+    if (bridge.available) { ensureReady().catch(function () { /* Inline recovery is already shown. */ }); } else { connect(); }
 }());
