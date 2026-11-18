@@ -9,10 +9,17 @@ const root = path.resolve(__dirname, '../..');
 test('onboarding covers the registry and exactly the supported credential fields', () => {
     const registry = fs.readFileSync(path.join(root, 'backend/services/provider_registry.py'), 'utf8');
     const adapters = [...registry.matchAll(/from providers\.(\w+) import/g)].map(m => m[1]).filter(name => name !== 'base');
+    const setup = fs.readFileSync(path.join(root, 'panel/index.html'), 'utf8').match(/<select id="key-provider">([\s\S]*?)<\/select>/)[1];
     for (const adapter of adapters) {
         const code = fs.readFileSync(path.join(root, 'backend/providers', adapter + '.py'), 'utf8');
-        const id = code.match(/    id = "([^"]+)"/)[1];
-        assert.ok(guides.get(id), id);
+        // Adapters declare an id on the class or pass it when registering each model.
+        const ids = [...code.matchAll(/(?:^    id = |Provider\(\s*)"([a-z0-9_]+)"/gm)].map(m => m[1]);
+        assert.ok(ids.length, adapter);
+        for (const id of ids) {
+            const guide = guides.get(id);
+            assert.ok(guide, id);
+            assert.ok(setup.includes('value="' + (guide.key || id) + '"'), id);
+        }
     }
     const credentials = fs.readFileSync(path.join(root, 'backend/services/studio_settings.py'), 'utf8');
     const allowed = [...credentials.match(/ALLOWED_KEYS = \{([^}]+)\}/)[1].matchAll(/"([^"]+)"/g)].map(m => m[1]);
@@ -75,7 +82,9 @@ async function studio(options = {}) {
     const windowEvents = {}, calls = [], storage = new Map();
     const configured = new Set(options.configured || []);
     if (options.saved) storage.set("kcf.studio.v1", JSON.stringify(options.saved));
-    const providers = () => guides.list.map(p => ({id: p.id, label: p.name, type: p.key ? 'cloud' : 'local', available: configured.has(p.id)}));
+    const providers = () => guides.list.map(p => Object.assign(
+        {id: p.id, label: p.name, type: p.key ? 'cloud' : 'local', available: configured.has(p.id)},
+        (options.providerInfo || {})[p.id]));
     const window = {
         addEventListener: (name, fn) => {windowEvents[name] = fn;},
         KCF_Settings: require('../js/settings'), KCF_Titles: require('../js/catalog'),
@@ -90,6 +99,7 @@ async function studio(options = {}) {
             calls.push({route, payload});
             if (route === '/health') {if (options.health) await options.health(); return {ffmpeg: true};}
             if (route === '/providers') return {providers: providers()};
+            if (route === '/transcribe') return {document: window.KCF_Transcript.demo(payload.language)};
             if (route === '/settings/provider-key') {if (options.save) await options.save(); configured.add(guides.get(payload.name).id); return {ok: true};}
         }}
     };
@@ -136,6 +146,47 @@ test('changing provider clears an incompatible custom model; reconnect preserves
     $('model').value = 'whisper-1';
     $('reconnect').events.click(); await settle();
     assert.equal($('model').value, 'whisper-1');
+});
+
+test('the fixed local models submit clips in their supported languages without cloud options', async () => {
+    const providerInfo = {
+        nvidia_fastconformer_ka: {supportedLanguages: ['ka-GE']},
+        nvidia_fastconformer_ka_80ms: {supportedLanguages: ['ka-GE']},
+        omnilingual_ctc_1b: {supportedLanguages: ['ka-GE', 'en-US', 'auto']}
+    };
+    const models = Object.keys(providerInfo);
+    const {$, calls, settle} = await studio({configured: models, providerInfo});
+    $('media-path').value = '/footage/ინტერვიუ.wav'; $('media-path').events.change.call($('media-path'));
+    for (const [field, value] of Object.entries({'max-words': 4, 'min-words': 1, 'pause-break': 0.55, 'max-chars': 42, 'min-duration': 0.5, 'max-duration': 3.5})) {
+        $(field).value = String(value);
+    }
+    $('keyterms').value = 'თბილისი'; $('diarize').checked = true;
+    for (const id of models) {
+        assert.ok($('provider').children.some(option => option.value === id), id);
+        $('key-provider').value = id; $('key-provider').events.change();
+        assert.equal($('provider-key-fields').hidden, true);
+        assert.match($('provider-setup-status').textContent, /Provider configured/);
+        $('use-provider').events.click();
+        assert.equal($('provider').value, id);
+        assert.equal($('recognition-options').hidden, true);
+        for (const language of ['en-US', 'auto', 'ka-GE']) {
+            $('language').value = language; $('language').events.change.call($('language'));
+            if (!providerInfo[id].supportedLanguages.includes(language)) {
+                assert.equal($('transcribe').disabled, true);
+                assert.match($('provider-detail').textContent, /Choose Georgian/);
+                continue;
+            }
+            assert.equal($('transcribe').disabled, false);
+            $('transcribe').events.click(); await settle();
+            const {payload} = calls.filter(c => c.route === '/transcribe').at(-1);
+            assert.equal(payload.provider, id);
+            assert.equal(payload.language, language);
+            assert.equal(payload.mediaPath, '/footage/ინტერვიუ.wav');
+            assert.deepEqual(Object.keys(payload.providerOptions), []);
+        }
+    }
+    $('provider').value = 'openai'; $('provider').events.change.call($('provider'));
+    assert.equal($('recognition-options').hidden, false);
 });
 
 test('starting the service waits for readiness without another user click', async () => {

@@ -40,13 +40,15 @@
         <label class="field">Language<select id="language"><option value="ka-GE">ქართული · Georgian</option><option value="en-US">English</option><option value="auto">Detect automatically</option></select></label>
         <label class="field">Transcription provider<select id="provider"><option value="elevenlabs">ElevenLabs Scribe v2</option></select></label>
         <p id="provider-detail" class="field-hint">Getting ready… Add your key in AI settings to transcribe.</p>
-        <button id="setup-ai" class="text-button">Set up this AI · account &amp; key guide ↗</button>
+        <button id="setup-ai" class="text-button">Set up this AI ↗</button>
         <div class="field-row"><label class="field">Words per caption<input id="max-words" type="number" min="1" max="6" value="4"></label><label class="field">Pause break (s)<input id="pause-break" type="number" min="0.1" max="5" step="0.05" value="0.55"></label></div>
         <details><summary>Transcription options</summary>
           <label class="field">Media location<input id="media-path" placeholder="Paste a full file path"></label>
-          <label class="field">Model (blank = provider default)<input id="model" placeholder="e.g. scribe_v2 or whisper-1"></label>
-          <label class="field">Names &amp; key terms<input id="keyterms" placeholder="თბილისი, your brand name"></label>
-          <label class="check"><input id="diarize" type="checkbox">Identify speakers where supported</label>
+          <div id="recognition-options">
+            <label class="field">Model (blank = provider default)<input id="model" placeholder="e.g. scribe_v2 or whisper-1"></label>
+            <label class="field">Names &amp; key terms<input id="keyterms" placeholder="თბილისი, your brand name"></label>
+            <label class="check"><input id="diarize" type="checkbox">Identify speakers where supported</label>
+          </div>
           <div class="field-row"><label class="field">Min. words per caption<input id="min-words" type="number" min="1" max="6" value="2"></label><label class="field">Maximum characters<input id="max-chars" type="number" min="4" max="200" value="42"></label></div>
           <div class="field-row"><label class="field">Min. duration (s)<input id="min-duration" type="number" min="0" max="30" value="0.5" step="0.1"></label><label class="field">Max. duration (s)<input id="max-duration" type="number" min="0.1" max="30" value="3.5" step="0.1"></label></div>
           <label class="check"><input id="remove-punctuation" type="checkbox">Remove commas and periods</label>
@@ -136,7 +138,7 @@
         <div class="pane-title"><span class="step">✦</span><div><h2>Connect your AI.</h2><p>Paste your key once. Then start captioning.</p></div></div>
         <div class="provider-onboarding">
           <p class="field-hint">An API key lets CapForge use your AI account. Think of it as a private access code. You do not need to upload a clip on the provider’s website.</p>
-          <label class="field">Choose an AI service<select id="key-provider"><optgroup label="Cloud · paste your own key"><option value="ELEVENLABS_API_KEY">ElevenLabs · start here for Georgian</option><option value="OPENAI_API_KEY">OpenAI · Whisper</option><option value="GLADIA_API_KEY">Gladia</option><option value="ASSEMBLYAI_API_KEY">AssemblyAI</option><option value="AZURE_SPEECH_KEY">Azure Speech</option></optgroup><optgroup label="Advanced · additional setup"><option value="google_chirp">Google Chirp</option><option value="whisper_cpp">Local whisper.cpp</option><option value="faster_whisper">Local faster-whisper</option><option value="mlx_whisper">Local MLX Whisper · Mac</option></optgroup></select></label>
+          <label class="field">Choose an AI service<select id="key-provider"><optgroup label="Cloud · paste your own key"><option value="ELEVENLABS_API_KEY">ElevenLabs · start here for Georgian</option><option value="OPENAI_API_KEY">OpenAI · Whisper</option><option value="GLADIA_API_KEY">Gladia</option><option value="ASSEMBLYAI_API_KEY">AssemblyAI</option><option value="AZURE_SPEECH_KEY">Azure Speech</option></optgroup><optgroup label="Advanced · additional setup"><option value="google_chirp">Google Chirp</option><option value="nvidia_fastconformer_ka">NVIDIA Georgian FastConformer</option><option value="nvidia_fastconformer_ka_80ms">NVIDIA Georgian FastConformer 80 ms</option><option value="omnilingual_ctc_1b">Meta Omnilingual CTC 1B v2</option><option value="whisper_cpp">Local whisper.cpp</option><option value="faster_whisper">Local faster-whisper</option><option value="mlx_whisper">Local MLX Whisper · Mac</option></optgroup></select></label>
           <details class="provider-guide"><summary id="provider-help-title">Where do I get a key?</summary><article aria-labelledby="provider-guide-name">
             <span id="provider-guide-badge" class="provider-badge"></span><h4 id="provider-guide-name"></h4><p id="provider-guide-description"></p>
             <button id="provider-account" class="secondary-button provider-link">Open account page ↗</button>
@@ -167,7 +169,7 @@
           <p class="fine-print">Update opens Setup for you. Save your project and close After Effects before clicking Install, then reopen After Effects when Setup finishes.</p>
         </section>
         </details>
-        <details><summary>Help &amp; privacy</summary><p>Cloud transcription sends extracted audio to the provider you select. Local providers can work offline once their packages and models are installed.</p><p>CapForge creates a fresh precomp on each run. Use AE’s Undo to undo a generation.</p><p>For additional Google and local Whisper settings, see docs/AI_SETUP.md in your installation folder. Check connection after setup.</p><p>Keep the installation folder in place. Your exports and raw provider responses stay in its exports folder.</p></details>
+        <details><summary>Help &amp; privacy</summary><p>Cloud transcription sends extracted audio to the provider you select. Local providers can work offline once their packages and models are installed.</p><p>CapForge creates a fresh precomp on each run. Use AE’s Undo to undo a generation.</p><p>For Google, NVIDIA and local Whisper setup, see docs/AI_SETUP.md in your installation folder.</p><p>Keep the installation folder in place. Your exports and raw provider responses stay in its exports folder.</p></details>
         <button id="open-guide" class="text-button full">Open quick start guide</button>
       </section>
     </aside>

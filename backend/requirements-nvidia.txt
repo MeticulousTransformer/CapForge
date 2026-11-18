@@ -1,0 +1,7 @@
+# Optional NVIDIA Georgian FastConformer inference on Python 3.12
+-c requirements-lock.txt
+nemo-toolkit[asr]==3.0.0
+torch==2.8.0
+torchaudio==2.8.0
+transformers==4.57.6
+setuptools<81

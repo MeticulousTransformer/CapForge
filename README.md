@@ -83,11 +83,17 @@ provides service authorization. Include the `lib/` and `titles/` folders.
 
 ## For editors
 
-Choose one transcription provider. Start with ElevenLabs for Georgian; review
-its output on your own recording. Leave **Model** blank for the adapter default
-unless you know which model you need. Switching provider clears the previous
-custom model. Configured means the local settings exist, not that billing or
-provider access has been tested.
+For recorded Georgian audio, choose **Georgian** in **Source**. Try **NVIDIA
+Georgian FastConformer** for local transcription or **ElevenLabs Scribe v2** for
+cloud transcription. For interviews, also try **Meta Omnilingual CTC 1B v2**.
+The menu includes NVIDIA’s **80 ms** variant. Each produces word times for the caption
+editor. The local choices need a one-time setup and model download. See the
+[model comparison and setup commands](docs/AI_SETUP.md#local-georgian-models).
+
+For providers with a **Model** field, leave it blank to use the adapter default.
+Switching provider clears the previous custom model.
+For cloud providers, **Configured** means CapForge found the local settings.
+Your first transcription checks account access.
 
 Cloud transcription needs an account and may incur charges. Demo captions and
 imported word-timed JSON work without a paid transcription request. Google and

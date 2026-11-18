@@ -79,6 +79,55 @@ Availability means the required software is found, rather than a model download
 or a successful transcription being verified. Restart the service and check
 connection after configuring these integrations.
 
+## Local Georgian models
+
+Choose **Georgian** in **Source**, then choose a named model in **Provider**.
+Each entry downloads its own weights from Hugging Face on first use and
+transcribes the audio on your computer. The models also work in the original
+ScriptUI panel. No cloud transcription account is required.
+
+**One-time install.** Close the CapForge service. On an Apple Silicon Mac,
+open Terminal and run the command for the model you want in the installed
+CapForge folder. Both NVIDIA choices share one install.
+
+```sh
+cd "$HOME/Library/Application Support/CapForge"
+# For NVIDIA FastConformer
+./.venv/bin/python -m pip install -r backend/requirements-nvidia.txt
+# For Meta Omnilingual CTC 1B v2
+./.venv/bin/python -m pip install -r backend/requirements-omnilingual.txt
+```
+
+On Windows, use PowerShell in the
+installed folder and choose the corresponding command.
+
+```powershell
+Set-Location "$env:LOCALAPPDATA\CapForge"
+.\.venv\Scripts\python.exe -m pip install -r backend/requirements-nvidia.txt
+.\.venv\Scripts\python.exe -m pip install -r backend/requirements-omnilingual.txt
+```
+
+The NVIDIA option uses an Apple Silicon PyTorch build on macOS. The Meta
+option uses ONNX Runtime. For a source checkout or a custom installation,
+use its folder in place of the default path.
+Reopen CapForge and refresh the providers in **Source**.
+Allow space for the runtime as well as the weights. The first transcription
+downloads the weights needed for that choice and later runs reuse them. Both
+runtimes can transcribe on CPU.
+
+| CapForge menu choice | When to try it | Published Georgian results |
+| --- | --- | --- |
+| NVIDIA Georgian FastConformer | First local choice for recorded clips. About 460 MB of weights. | NVIDIA reports 5.73% word error rate on Common Voice 17 and 13.44% on FLEURS. [Model card](https://huggingface.co/nvidia/stt_ka_fastconformer_hybrid_large_pc) |
+| NVIDIA Georgian FastConformer 80 ms | Uses the streaming-trained model for the words and the offline model to align them with the recording. The name refers to training look-ahead. About 920 MB total, or 460 MB more if you already used the first model. | On the same tests NVIDIA reports 7.44% and 16.00% respectively. [Model card](https://huggingface.co/nvidia/stt_ka_fastconformer_hybrid_transducer_ctc_large_streaming_80ms_pc) |
+| Meta Omnilingual CTC 1B v2 | A local alternative for interviews. CapForge uses OpenVoiceOS’s roughly 1 GB INT8 conversion. The model infers the language from the recording and generally omits punctuation. | Tembra reports 19.89% word error on its Georgian YouTube set and 17.00% on its FLEURS subset for Meta’s original model. Those scores apply to the original weights. [INT8 model card](https://huggingface.co/OpenVoiceOS/omnilingual-asr-ctc-1b-onnx) · [Evaluation](https://huggingface.co/TembraAIPlatform/tembra-georgian-asr) |
+
+Lower word error rate means fewer incorrect, missing or extra words. For
+interviews, the cloud options are also worth comparing. On Tembra’s Georgian
+YouTube evaluation, ElevenLabs Scribe v2 scored 11.00%, Google Chirp 3 scored
+16.13% and the offline NVIDIA model scored 24.11%. Tembra’s own system scored
+11.55%. Its Hugging Face listing publishes benchmark results, with proprietary
+weights. [Evaluation and methodology](https://huggingface.co/TembraAIPlatform/tembra-georgian-asr)
+
 ## When something needs attention
 
 - **Cannot save a key:** use the panel inside AE, start the service and check

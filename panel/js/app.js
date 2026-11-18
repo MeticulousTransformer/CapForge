@@ -27,11 +27,14 @@
     }
     function setDot(id, ready) { $(id).className = "status-dot" + (ready ? " ready" : ""); }
     function currentProvider() { return state.providers.filter(function (p) { return p.id === $("provider").value; })[0]; }
+    function languageMismatch(provider) {
+        return !!(provider && provider.supportedLanguages && provider.supportedLanguages.indexOf($("language").value) === -1);
+    }
     function readiness() {
         var provider = currentProvider(), live = bridge.available;
         updates.setEnabled(live && state.connected && !state.busy);
         $("generate").disabled = !live || state.busy || !state.doc || !state.comp;
-        $("transcribe").disabled = !live || state.busy || !state.media || !state.connected || !state.ffmpeg || !provider || !provider.available;
+        $("transcribe").disabled = !live || state.busy || !state.media || !state.connected || !state.ffmpeg || !provider || !provider.available || languageMismatch(provider);
         $("prepare-audio").disabled = !live || state.busy || !state.media || !state.connected || !state.ffmpeg;
         $("scan-providers").disabled = !live || state.busy;
         $("save-key").disabled = !live || state.busy;
@@ -141,9 +144,14 @@
         return { minWords: Math.min(minWords, maxWords), maxWords: maxWords, maxChars: maxChars, pauseBreakSeconds: pause, minCaptionDuration: minDuration, maxCaptionDuration: maxDuration, removeCommasAndPeriods: $("remove-punctuation").checked };
     }
     function updateProvider() {
-        var provider = currentProvider();
+        var provider = currentProvider(), guide = provider && providerGuide.get(provider.id);
+        $("recognition-options").hidden = !!(guide && guide.fixedModel);
         $("provider-detail").textContent = provider ? (provider.available ? "Ready · " + (provider.type === "local" ? "runs on this computer" : "cloud transcription") : "Setup needed · " + (provider.detail || "configure this provider")) : "Getting ready… Add your key in AI settings to transcribe.";
-        if (provider && $("language").value === "ka-GE" && provider.id !== "elevenlabs") { $("provider-detail").textContent += ". Georgian quality varies; start with ElevenLabs."; }
+        if (languageMismatch(provider)) {
+            var setupHint = provider.available ? "" : " " + $("provider-detail").textContent;
+            $("provider-detail").textContent = "Choose Georgian in Language to use this model." + setupHint;
+        }
+        else if (guide && guide.fixedModel) { $("provider-detail").textContent += ". " + guide.description; }
         $("key-status").textContent = provider && provider.available ? "Selected provider is configured" : "Selected provider needs configuration";
         setDot("key-dot", provider && provider.available); readiness();
         updateGuideStatus();
@@ -152,7 +160,13 @@
         var guide = providerGuide.get($("key-provider").value);
         var configured = state.providers.some(function (p) { return p.id === guide.id && p.available; });
         $("setup-retry").hidden = !startupError;
-        $("provider-setup-status").textContent = !bridge.available ? "Open CapForge inside After Effects to save your key." : startupError ? startupError : !state.connected ? "Getting ready… You can paste your key now." : configured ? "Key saved on this computer. Your first transcription checks account access." : guide.key ? "Paste your key, then save and continue. No transcription is charged until you choose Transcribe." : "Follow the additional setup instructions below.";
+        var message;
+        if (!bridge.available) { message = "Open CapForge in After Effects to set up this provider."; }
+        else if (startupError) { message = startupError; }
+        else if (!state.connected) { message = guide.key ? "Getting ready… You can paste your key now." : "Connecting to the local service…"; }
+        else if (configured) { message = guide.key ? "Key saved on this computer. Your first transcription checks account access." : "Provider configured. Choose footage to transcribe."; }
+        else { message = guide.key ? "Paste your key, then save and continue. No transcription is charged until you choose Transcribe." : "Open Setup instructions for the additional setup steps."; }
+        $("provider-setup-status").textContent = message;
     }
     function renderProviderGuide() {
         var guide = providerGuide.get($("key-provider").value);
@@ -320,8 +334,12 @@
     $("language").addEventListener("change", function () { persist(); updateProvider(); if (state.doc.provider === "demo") { setDocument(transcript.demo(this.value), "Built-in sample. Import JSON or transcribe your own clip."); } });
     $("provider").addEventListener("change", function () { $("model").value = ""; preferredProvider = this.value; updateProvider(); persist(); });
     $("transcribe").addEventListener("click", function () { operation("Transcribing your clip…", function () {
-        var options = {keyterms: $("keyterms").value.split(",").map(function (word) { return word.trim(); }).filter(Boolean), diarize: $("diarize").checked};
-        if ($("model").value.trim()) { options.model = $("model").value.trim(); }
+        var options = {};
+        if (!$("recognition-options").hidden) {
+            options.keyterms = $("keyterms").value.split(",").map(function (word) { return word.trim(); }).filter(Boolean);
+            options.diarize = $("diarize").checked;
+            if ($("model").value.trim()) { options.model = $("model").value.trim(); }
+        }
         return api.request("/transcribe", { mediaPath: state.media.path, language: $("language").value, provider: $("provider").value, grouping: grouping(), providerOptions: options }).then(function (result) {
             setDocument(result.document, "Your transcript · " + (result.timingQuality || "word") + " timing. Export JSON to save edits."); tab("transcript"); status("Transcript ready · review your words");
             if (result.warnings && result.warnings.length) { notice(result.warnings.join(" ")); }

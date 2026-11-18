@@ -13,6 +13,8 @@ from providers.assemblyai import AssemblyAIProvider
 from providers.whisper_cpp import WhisperCppProvider
 from providers.faster_whisper_local import FasterWhisperProvider
 from providers.mlx_whisper_local import MlxWhisperProvider
+from providers.nvidia_georgian import NVIDIA_GEORGIAN_MODELS
+from providers.omnilingual_ctc import OmnilingualCTCProvider
 
 PROVIDERS: List[ASRProvider] = [
     ElevenLabsScribeProvider(),
@@ -24,6 +26,8 @@ PROVIDERS: List[ASRProvider] = [
     WhisperCppProvider(),
     FasterWhisperProvider(),
     MlxWhisperProvider(),
+    *NVIDIA_GEORGIAN_MODELS,
+    OmnilingualCTCProvider(),
 ]
 
 

@@ -1,0 +1,5 @@
+# Optional CPU inference for Meta Omnilingual CTC 1B v2
+-c requirements-lock.txt
+onnxruntime==1.27.0
+huggingface-hub>=0.24,<1
+numpy

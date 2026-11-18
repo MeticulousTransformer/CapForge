@@ -39,11 +39,13 @@ KCF_loadTitles(new Folder(new File($.fileName).parent.fsName + "/titles"));
         doc: null,                       // last normalized TranscriptDocument
         providerIds: ["elevenlabs", "google_chirp", "openai", "azure_speech",
                       "gladia", "assemblyai", "whisper_cpp", "faster_whisper",
-                      "mlx_whisper"],
+                      "mlx_whisper", "nvidia_fastconformer_ka", "nvidia_fastconformer_ka_80ms",
+                      "omnilingual_ctc_1b"],
         providerLabels: ["ElevenLabs Scribe v2", "Google Chirp", "OpenAI whisper-1",
                          "Azure AI Speech", "Gladia (Whisper cloud)", "AssemblyAI",
                          "Local whisper.cpp", "Local faster-whisper",
-                         "Local mlx-whisper"]
+                         "Local mlx-whisper", "NVIDIA Georgian FastConformer",
+                         "NVIDIA Georgian FastConformer 80 ms", "Meta Omnilingual CTC 1B v2"]
     };
 
     function buildUI(thisObj) {
@@ -538,6 +540,17 @@ KCF_loadTitles(new Folder(new File($.fileName).parent.fsName + "/titles"));
             var i = ddProv.selection ? ddProv.selection.index : 0;
             return state.providerIds[i];
         }
+        function updateAsrOptions() {
+            var id = providerId();
+            var georgianOnly = id === "nvidia_fastconformer_ka" || id === "nvidia_fastconformer_ka_80ms";
+            gAsr.enabled = !georgianOnly && id !== "omnilingual_ctc_1b";
+            btnTranscribe.enabled = !georgianOnly || langCode() === "ka-GE";
+            var help = "Choose Georgian in Language to use this model.";
+            var autoLanguage = "Meta Omnilingual recognizes the language from the audio.";
+            if (!btnTranscribe.enabled) { status(help); }
+            else if (id === "omnilingual_ctc_1b") { status(autoLanguage); }
+            else if (stStatus.text === help || stStatus.text === autoLanguage) { status("Ready."); }
+        }
         /* parseFloat with a fallback that survives a legitimate 0, which
            the "or default" idiom would swallow. */
         function num(text, fallback) {
@@ -681,6 +694,8 @@ KCF_loadTitles(new Folder(new File($.fileName).parent.fsName + "/titles"));
         }
 
         // ---- handlers ----
+        ddProv.onChange = updateAsrOptions;
+        ddLang.onChange = updateAsrOptions;
         btnBrowse.onClick = function () {
             var f = File.openDialog("Select audio/video file");
             if (f) {
@@ -753,19 +768,20 @@ KCF_loadTitles(new Folder(new File($.fileName).parent.fsName + "/titles"));
             try {
                 status("Scanning providers…");
                 var resp = KCF_httpJSON("GET", host(), port(), "/providers", null);
-                var ids = [], labels = [];
+                var previous = providerId(), ids = [], labels = [], keep = 0;
                 for (var i = 0; i < resp.providers.length; i++) {
                     var p = resp.providers[i];
+                    if (p.id === previous) { keep = i; }
                     ids.push(p.id);
                     labels.push((p.available ? "✓ " : "✗ ") + p.label +
                         (p.available ? "" : "  (" + (p.detail || "unavailable") + ")"));
                 }
                 state.providerIds = ids;
-                var keep = ddProv.selection ? ddProv.selection.index : 0;
                 ddProv.removeAll();
                 for (var j = 0; j < labels.length; j++) { ddProv.add("item", labels[j]); }
-                ddProv.selection = Math.min(keep, labels.length - 1);
+                if (labels.length) { ddProv.selection = keep; }
                 status("Provider scan done.");
+                updateAsrOptions();
             } catch (e) {
                 alert(e.message);
                 status("Scan failed.");
@@ -781,16 +797,19 @@ KCF_loadTitles(new Folder(new File($.fileName).parent.fsName + "/titles"));
                 return;
             }
             persistSettings();
-            var providerOptions = { diarize: cbDiarize.value };
-            if (etModel.text) { providerOptions.model = etModel.text; }
-            if (etKeyterms.text) {
-                var terms = etKeyterms.text.split(",");
-                var clean = [];
-                for (var t = 0; t < terms.length; t++) {
-                    var term = terms[t].replace(/^\s+|\s+$/g, "");
-                    if (term) { clean.push(term); }
+            var providerOptions = {};
+            if (gAsr.enabled) {
+                providerOptions.diarize = cbDiarize.value;
+                if (etModel.text) { providerOptions.model = etModel.text; }
+                if (etKeyterms.text) {
+                    var terms = etKeyterms.text.split(",");
+                    var clean = [];
+                    for (var t = 0; t < terms.length; t++) {
+                        var term = terms[t].replace(/^\s+|\s+$/g, "");
+                        if (term) { clean.push(term); }
+                    }
+                    if (clean.length) { providerOptions.keyterms = clean; }
                 }
-                if (clean.length) { providerOptions.keyterms = clean; }
             }
             var payload = {
                 mediaPath: state.mediaPath,
